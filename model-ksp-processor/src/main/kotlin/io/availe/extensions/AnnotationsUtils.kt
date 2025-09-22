@@ -21,7 +21,7 @@ internal fun KSClassDeclaration.extractAllOptInMarkers(): List<String> {
     val classMarkers = this.annotations
         .filter { it.isAnnotation(OPT_IN_ANNOTATION_NAME) }
         .flatMap { optInAnnotation ->
-            (optInAnnotation.arguments.first().value as? List<*>)?.mapNotNull {
+            (optInAnnotation.arguments.firstOrNull()?.value as? List<*>)?.mapNotNull {
                 (it as? KSType)?.declaration?.qualifiedName?.asString()
             } ?: emptyList()
         }
@@ -30,7 +30,7 @@ internal fun KSClassDeclaration.extractAllOptInMarkers(): List<String> {
         .flatMap { property -> property.annotations }
         .filter { annotation -> annotation.isAnnotation(OPT_IN_ANNOTATION_NAME) }
         .flatMap { optInAnnotation ->
-            (optInAnnotation.arguments.first().value as? List<*>)?.mapNotNull {
+            (optInAnnotation.arguments.firstOrNull()?.value as? List<*>)?.mapNotNull {
                 (it as? KSType)?.declaration?.qualifiedName?.asString()
             } ?: emptyList()
         }

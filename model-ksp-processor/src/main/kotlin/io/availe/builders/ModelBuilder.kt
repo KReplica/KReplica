@@ -18,11 +18,20 @@ private fun parseApplyAnnotations(
     }
 
     return applyAnnotations.flatMap { annotation ->
-        val includeArg = (annotation.arguments.first { it.name?.asString() == "include" }.value as List<*>)
-            .map { DtoVariant.valueOf((it as KSDeclaration).simpleName.asString()) }.toSet()
-        val excludeArg = (annotation.arguments.first { it.name?.asString() == "exclude" }.value as List<*>)
-            .map { DtoVariant.valueOf((it as KSDeclaration).simpleName.asString()) }.toSet()
-        val annotationsToApply = annotation.arguments.first { it.name?.asString() == "annotations" }.value as List<*>
+        val includeArgValue = annotation.arguments.find { it.name?.asString() == "include" }?.value
+        val includeArg = (includeArgValue as? List<*>)
+            ?.map { DtoVariant.valueOf((it as KSDeclaration).simpleName.asString()) }
+            ?.toSet()
+            ?: emptySet()
+
+        val excludeArgValue = annotation.arguments.find { it.name?.asString() == "exclude" }?.value
+        val excludeArg = (excludeArgValue as? List<*>)
+            ?.map { DtoVariant.valueOf((it as KSDeclaration).simpleName.asString()) }
+            ?.toSet()
+            ?: emptySet()
+
+        val annotationsToApplyValue = annotation.arguments.find { it.name?.asString() == "annotations" }?.value
+        val annotationsToApply = (annotationsToApplyValue as? List<*>) ?: emptyList<Any?>()
 
         val allTargetedVariants = includeArg + excludeArg
         val unknownVariants = allTargetedVariants - masterDtoVariants
@@ -35,7 +44,7 @@ private fun parseApplyAnnotations(
             )
         }
 
-        val initialSet = if (includeArg.isNotEmpty()) includeArg else masterDtoVariants
+        val initialSet = includeArg.ifEmpty { masterDtoVariants }
         val finalVariants = initialSet - excludeArg
 
         annotationsToApply.map { annotationToApplyType ->
