@@ -260,7 +260,7 @@ private interface UserAccount {
 
 ## Contextual nested models
 
-Note: Nested Contextuals only work for KReplica declaration that all reside within the same module. Adding multi-module support is possible, since each module creates a separate `models.json` file, which in theory could be merged for processing. However, it is not a current priority for me, as currently, I typically declare all my KReplica DTO's within a shared module that connects the client and server modules.
+Note: Nested Contextuals only work for KReplica declaration that all reside within the same module. Adding multi-module support is possible, since each module creates a separate `models.json` file, which in theory could be merged for processing. However, it is not currently a priority for me, as I typically declare all my KReplica DTO's within a shared module that connects the client and server modules.
 
 Say that you previously defined `UserAccount`:
 
