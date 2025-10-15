@@ -2,7 +2,7 @@
 
 KReplica is a DTO generator for KMP and Kotlin JVM. It runs automatically during Kotlin compilation.
 
-Also check out the new [website](https://kreplica.availe.io) for KReplica (its documentation is more up-to-date than the README).
+Also check out the new [website](https://kreplica.availe.io) for KReplica. The documentation site is currently more up-to-date than the README; except the fact that it currently does not cover the nested contextual feature.
 
 ### Features:
 
@@ -23,7 +23,7 @@ Add the KSP and KReplica plugins to your module's `build.gradle.kts`:
 ```kotlin
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2" // Use a KSP version that matches your Kotlin version
-    id("io.availe.kreplica") version "5.0.1"
+    id("io.availe.kreplica") version "5.0.4"
 }
 ```
 
@@ -259,6 +259,8 @@ private interface UserAccount {
 ```
 
 ## Contextual nested models
+
+Note: Nested Contextuals only work for KReplica declaration that all reside within the same module. Adding multi-module support is possible, since each module creates a separate `models.json` file, which in theory could be merged for processing. However, it is not a current priority for me, as currently, I typically declare all my KReplica DTO's within a shared module that connects the client and server modules.
 
 Say that you previously defined `UserAccount`:
 
