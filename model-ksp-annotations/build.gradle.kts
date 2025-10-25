@@ -24,6 +24,10 @@ kotlin {
         }
         nodejs()
     }
+    js {
+        browser()
+        nodejs()
+    }
 
     sourceSets {
         commonMain {
