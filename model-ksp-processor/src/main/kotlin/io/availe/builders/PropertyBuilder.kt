@@ -5,6 +5,7 @@ import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
+import io.availe.SCHEMA_SUFFIX
 import io.availe.extensions.*
 import io.availe.models.*
 
@@ -103,7 +104,8 @@ internal fun processProperty(
             foreignDecl,
             propertyVariants,
             propertyAnnotations,
-            finalAutoContextual
+            finalAutoContextual,
+            environment
         )
     } else {
         RegularProperty(
@@ -122,18 +124,22 @@ private fun createForeignProperty(
     foreignModelDeclaration: KSClassDeclaration,
     dtoVariants: Set<DtoVariant>,
     annotations: List<AnnotationModel>,
-    autoContextual: AutoContextual
+    autoContextual: AutoContextual,
+    environment: SymbolProcessorEnvironment
 ): ForeignProperty {
-    val simpleName = foreignModelDeclaration.simpleName.asString()
-    val foreignModelNameForLookup = if (simpleName.endsWith("Schema")) {
-        simpleName.removeSuffix("Schema")
-    } else {
-        simpleName
-    }
+    val versionName = foreignModelDeclaration.simpleName.asString()
+    val baseModelDecl = foreignModelDeclaration.parentDeclaration as? KSClassDeclaration
+        ?: fail(
+            environment,
+            "Could not determine parent declaration for generated model '${foreignModelDeclaration.qualifiedName?.asString()}'"
+        )
+    val baseModelName = baseModelDecl.simpleName.asString().removeSuffix(SCHEMA_SUFFIX)
+
     return ForeignProperty(
         name = propertyDeclaration.simpleName.asString(),
         typeInfo = typeInformation,
-        foreignModelName = foreignModelNameForLookup,
+        baseModelName = baseModelName,
+        versionName = versionName,
         dtoVariants = dtoVariants,
         annotations = annotations,
         autoContextual = autoContextual

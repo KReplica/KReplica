@@ -23,7 +23,7 @@ internal fun buildDataTransferObjectClass(
     model: Model,
     properties: List<Property>,
     dtoVariant: DtoVariant,
-    modelsByName: Map<String, Model>
+    modelsByBaseName: Map<String, List<Model>>
 ): TypeSpec {
     val constructorBuilder = FunSpec.constructorBuilder()
     return TypeSpec.classBuilder(dtoVariant.suffix).apply {
@@ -31,7 +31,7 @@ internal fun buildDataTransferObjectClass(
         addSuperinterfacesFor(model, dtoVariant)
         addAnnotationsFor(model, dtoVariant)
         properties.forEach { property ->
-            addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByName)
+            addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByBaseName)
         }
         primaryConstructor(constructorBuilder.build())
     }.build()
@@ -69,10 +69,10 @@ private fun TypeSpec.Builder.addConfiguredProperty(
     property: Property,
     model: Model,
     dtoVariant: DtoVariant,
-    modelsByName: Map<String, Model>
+    modelsByBaseName: Map<String, List<Model>>
 ) {
     val isContainerSerializable = model.isSerializable(dtoVariant)
-    val typeName = resolveTypeNameForProperty(property, dtoVariant, model, modelsByName, isContainerSerializable)
+    val typeName = resolveTypeNameForProperty(property, dtoVariant, model, modelsByBaseName, isContainerSerializable)
 
     val paramBuilder = ParameterSpec.builder(property.name, typeName).apply {
         val shouldFilterContextual = (dtoVariant == DtoVariant.PATCH)

@@ -36,17 +36,17 @@ internal fun generateDataClasses(
     codeGenerator: CodeGenerator,
     dependencies: Dependencies
 ) {
-    val modelsByName = allModels.associateBy { it.name }
+    val modelsByBaseName = allModels.groupBy { it.isVersionOf ?: it.name }
     val primaryModelsByBaseName = primaryModels.groupBy { it.isVersionOf ?: it.name }
     primaryModelsByBaseName.forEach { (baseName, versions) ->
-        generateSchemaFile(baseName, versions, modelsByName, codeGenerator, dependencies)
+        generateSchemaFile(baseName, versions, modelsByBaseName, codeGenerator, dependencies)
     }
 }
 
 private fun generateSchemaFile(
     baseName: String,
     versions: List<Model>,
-    modelsByName: Map<String, Model>,
+    modelsByBaseName: Map<String, List<Model>>,
     codeGenerator: CodeGenerator,
     dependencies: Dependencies
 ) {
@@ -57,9 +57,9 @@ private fun generateSchemaFile(
         addFileComment(FILE_HEADER_COMMENT)
         addOptInMarkersForModels(versions)
         if (representativeModel.isVersionOf != null) {
-            generateVersionedSchema(baseName, versions, modelsByName)
+            generateVersionedSchema(baseName, versions, modelsByBaseName)
         } else {
-            generateUnversionedSchema(baseName, versions.first(), modelsByName)
+            generateUnversionedSchema(baseName, versions.first(), modelsByBaseName)
         }
     }.build()
 
@@ -69,7 +69,7 @@ private fun generateSchemaFile(
 private fun FileSpec.Builder.generateVersionedSchema(
     baseName: String,
     versions: List<Model>,
-    modelsByName: Map<String, Model>
+    modelsByBaseName: Map<String, List<Model>>
 ) {
     val representativeModel = versions.first()
     val schemaFileName = (representativeModel.isVersionOf ?: representativeModel.name) + SCHEMA_SUFFIX
@@ -94,7 +94,7 @@ private fun FileSpec.Builder.generateVersionedSchema(
         }
 
         versions.forEach { version ->
-            val dtos = generateDataTransferObjects(version, modelsByName)
+            val dtos = generateDataTransferObjects(version, modelsByBaseName)
             val versionClass = TypeSpec.interfaceBuilder(version.name).apply {
                 addModifiers(KModifier.SEALED)
                 addSuperinterface(ClassName(version.packageName, schemaFileName))
@@ -114,7 +114,7 @@ private fun FileSpec.Builder.generateVersionedSchema(
 private fun FileSpec.Builder.generateUnversionedSchema(
     baseName: String,
     model: Model,
-    modelsByName: Map<String, Model>
+    modelsByBaseName: Map<String, List<Model>>
 ) {
     val schemaFileName = model.name + SCHEMA_SUFFIX
     val schemaInterfaceName = ClassName(model.packageName, schemaFileName)
@@ -129,7 +129,7 @@ private fun FileSpec.Builder.generateUnversionedSchema(
             addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
         }
 
-        val dtos = generateDataTransferObjects(model, modelsByName)
+        val dtos = generateDataTransferObjects(model, modelsByBaseName)
         dtos.forEach { dtoSpec ->
             val dtoBuilder = dtoSpec.toBuilder().apply {
                 addSuperinterface(schemaInterfaceName)
@@ -149,11 +149,11 @@ private fun FileSpec.Builder.generateUnversionedSchema(
     addType(schemaBuilder)
 }
 
-private fun generateDataTransferObjects(model: Model, modelsByName: Map<String, Model>): List<TypeSpec> {
+private fun generateDataTransferObjects(model: Model, modelsByBaseName: Map<String, List<Model>>): List<TypeSpec> {
     return model.dtoVariants.mapNotNull { variant ->
         val fields = model.fieldsFor(variant)
         if (fields.isNotEmpty()) {
-            buildDataTransferObjectClass(model, fields, variant, modelsByName)
+            buildDataTransferObjectClass(model, fields, variant, modelsByBaseName)
         } else null
     }
 }

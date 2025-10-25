@@ -12,7 +12,7 @@ internal fun Model.fieldsFor(dtoVariant: DtoVariant): List<Property> =
     this.properties.filter { dtoVariant in it.dtoVariants }
 
 internal fun validateModelReplications(allModels: List<Model>) {
-    val modelsByName = allModels.associateBy { it.name }
+    val modelsByBaseAndVersion = allModels.associateBy { (it.isVersionOf) to it.name }
     val validationErrors = mutableListOf<String>()
     allModels.forEach { model ->
         if (DtoVariant.CREATE in model.dtoVariants && model.fieldsFor(DtoVariant.CREATE).isEmpty()) {
@@ -24,9 +24,9 @@ internal fun validateModelReplications(allModels: List<Model>) {
         model.properties
             .filterIsInstance<ForeignProperty>()
             .forEach { foreignProperty ->
-                val targetModelName = foreignProperty.foreignModelName
-                val targetModel = modelsByName[targetModelName]
-                    ?: error("Unknown referenced model '$targetModelName' in ${model.name}")
+                val targetModelKey = (foreignProperty.baseModelName) to (foreignProperty.versionName)
+                val targetModel = modelsByBaseAndVersion[targetModelKey]
+                    ?: error("Unknown referenced model base='${foreignProperty.baseModelName}' version='${foreignProperty.versionName}' in ${model.name}")
 
                 if (DtoVariant.CREATE in foreignProperty.dtoVariants && !(DtoVariant.CREATE in targetModel.dtoVariants)) {
                     validationErrors.add(createDependencyError(model, foreignProperty, targetModel, DtoVariant.CREATE))
@@ -64,7 +64,7 @@ private fun createDependencyError(
     Details:
         Parent Model      : ${parentModel.name} (variants: ${parentModel.dtoVariants})
         Variant Requested : ${dtoVariant.name}
-        Nested Property   : ${violatingProperty.name} (type: ${targetModel.name})
+        Nested Property   : ${violatingProperty.name} (type: ${violatingProperty.baseModelName}.${violatingProperty.versionName})
 
     Why:
         The parent model '${parentModel.name}' is configured to generate a '${dtoVariant.name}' variant.

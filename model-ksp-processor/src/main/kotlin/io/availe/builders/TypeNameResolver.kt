@@ -11,7 +11,7 @@ internal fun resolveTypeNameForProperty(
     property: Property,
     dtoVariant: DtoVariant,
     model: Model,
-    modelsByName: Map<String, Model>,
+    modelsByBaseName: Map<String, List<Model>>,
     isContainerSerializable: Boolean
 ): TypeName {
     val patchableClassName = if (model.isSerializable(dtoVariant)) {
@@ -23,7 +23,7 @@ internal fun resolveTypeNameForProperty(
     val finalAutoContextualEnabled = property.autoContextual == AutoContextual.ENABLED
 
     val baseType = if (property is ForeignProperty) {
-        buildRecursiveDtoTypeName(property.typeInfo, dtoVariant, modelsByName, isContainerSerializable)
+        buildRecursiveDtoTypeName(property, dtoVariant, modelsByBaseName, isContainerSerializable)
     } else {
         buildTypeNameWithContextual(property.typeInfo, isContainerSerializable, finalAutoContextualEnabled)
     }
@@ -45,14 +45,48 @@ private fun buildSimpleTypeName(typeInfo: TypeInfo): TypeName {
 }
 
 internal fun buildRecursiveDtoTypeName(
+    property: ForeignProperty,
+    dtoVariant: DtoVariant,
+    modelsByBaseName: Map<String, List<Model>>,
+    isCurrentContainerSerializable: Boolean
+): TypeName {
+    val typeInfo = property.typeInfo
+
+    val targetModel = modelsByBaseName[property.baseModelName]
+        ?.find { it.name == property.versionName }
+        ?: error("KReplica Error: Could not resolve foreign model for baseName='${property.baseModelName}' and versionName='${property.versionName}'.")
+
+    if (typeInfo.arguments.isEmpty()) {
+        val finalDtoName = if (targetModel.isVersionOf != null) {
+            ClassName(targetModel.packageName, "${targetModel.isVersionOf}Schema", targetModel.name, dtoVariant.suffix)
+        } else {
+            ClassName(targetModel.packageName, "${targetModel.name}Schema", dtoVariant.suffix)
+        }
+        return finalDtoName.copy(nullable = typeInfo.isNullable)
+    } else {
+        val rawType = typeInfo.qualifiedName.asClassName()
+        val transformedArgs = typeInfo.arguments.map { arg ->
+            buildRecursiveDtoTypeName(
+                arg,
+                dtoVariant,
+                modelsByBaseName,
+                isCurrentContainerSerializable
+            )
+        }
+        return rawType.parameterizedBy(transformedArgs).copy(nullable = typeInfo.isNullable)
+    }
+}
+
+private fun buildRecursiveDtoTypeName(
     typeInfo: TypeInfo,
     dtoVariant: DtoVariant,
-    modelsByName: Map<String, Model>,
+    modelsByBaseName: Map<String, List<Model>>,
     isCurrentContainerSerializable: Boolean
 ): TypeName {
     val simpleName = typeInfo.qualifiedName.substringAfterLast('.')
     val lookupKey = if (simpleName.endsWith("Schema")) simpleName.removeSuffix("Schema") else simpleName
-    val targetModel = modelsByName[lookupKey]
+
+    val targetModel = modelsByBaseName[lookupKey]?.firstOrNull()
 
     if (typeInfo.arguments.isEmpty()) {
         if (targetModel == null) {
@@ -68,13 +102,12 @@ internal fun buildRecursiveDtoTypeName(
     } else {
         val rawType = typeInfo.qualifiedName.asClassName()
         val transformedArgs = typeInfo.arguments.map { arg ->
-            val isNestedContainerSerializable =
-                modelsByName[arg.qualifiedName]?.isSerializable(dtoVariant) ?: isCurrentContainerSerializable
-            buildRecursiveDtoTypeName(arg, dtoVariant, modelsByName, isNestedContainerSerializable)
+            buildRecursiveDtoTypeName(arg, dtoVariant, modelsByBaseName, isCurrentContainerSerializable)
         }
         return rawType.parameterizedBy(transformedArgs).copy(nullable = typeInfo.isNullable)
     }
 }
+
 
 internal fun buildTypeNameWithContextual(
     typeInfo: TypeInfo,

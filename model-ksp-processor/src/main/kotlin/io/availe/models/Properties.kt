@@ -24,7 +24,8 @@ internal data class RegularProperty(
 internal data class ForeignProperty(
     override val name: String,
     override val typeInfo: TypeInfo,
-    val foreignModelName: String,
+    val baseModelName: String,
+    val versionName: String,
     override val dtoVariants: Set<DtoVariant>,
     override val annotations: List<AnnotationModel> = emptyList(),
     override val autoContextual: AutoContextual
