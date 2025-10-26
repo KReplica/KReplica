@@ -19,7 +19,8 @@ internal data class Model(
     val optInMarkers: List<String> = emptyList(),
     val isVersionOf: String? = null,
     val schemaVersion: Int? = null,
-    val autoContextual: AutoContextual = AutoContextual.ENABLED
+    val autoContextual: AutoContextual = AutoContextual.ENABLED,
+    val visibility: DtoVisibility = DtoVisibility.PUBLIC
 ) {
     init {
         require(properties.isNotEmpty()) {

@@ -15,3 +15,9 @@ enum class AutoContextual {
     DISABLED,
     INHERIT
 }
+
+@Serializable
+enum class DtoVisibility {
+    PUBLIC,
+    INTERNAL
+}

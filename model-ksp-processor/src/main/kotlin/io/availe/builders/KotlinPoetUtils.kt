@@ -11,9 +11,7 @@ import java.nio.charset.StandardCharsets
 
 internal fun String.asClassName(): ClassName {
     val cleanName = this.substringBefore('<').removeSuffix("?")
-    val packageName = cleanName.substringBeforeLast('.')
-    val simpleName = cleanName.substringAfterLast('.')
-    return ClassName(packageName, simpleName)
+    return ClassName.bestGuess(cleanName)
 }
 
 internal fun buildAnnotationSpec(annotationModel: AnnotationModel): AnnotationSpec {

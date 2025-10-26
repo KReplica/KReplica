@@ -127,7 +127,8 @@ internal fun getFrameworkDeclarations(resolver: Resolver): Set<KSClassDeclaratio
         REPLICATE_PROPERTY_ANNOTATION_NAME,
         REPLICATE_SCHEMA_VERSION_ANNOTATION_NAME,
         REPLICATE_APPLY_ANNOTATION_NAME,
-        REPLICATE_HIDE_ANNOTATION_NAME
+        REPLICATE_HIDE_ANNOTATION_NAME,
+        REPLICATE_FLATTEN_ANNOTATION_NAME
     )
         .mapNotNull { fullyQualifiedName ->
             resolver.getClassDeclarationByName(resolver.getKSNameFromString(fullyQualifiedName))

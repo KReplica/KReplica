@@ -30,3 +30,14 @@ internal data class ForeignProperty(
     override val annotations: List<AnnotationModel> = emptyList(),
     override val autoContextual: AutoContextual
 ) : Property()
+
+@Serializable
+internal data class FlattenedProperty(
+    override val name: String,
+    override val typeInfo: TypeInfo,
+    val foreignBaseModelName: String,
+    val foreignVersionName: String,
+    override val dtoVariants: Set<DtoVariant>,
+    override val annotations: List<AnnotationModel> = emptyList(),
+    override val autoContextual: AutoContextual
+) : Property()

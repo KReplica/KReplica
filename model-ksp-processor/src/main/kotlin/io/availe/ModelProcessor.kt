@@ -12,6 +12,9 @@ import io.availe.extensions.KReplicaAnnotationContext
 import io.availe.extensions.MODEL_ANNOTATION_NAME
 import io.availe.extensions.getFrameworkDeclarations
 import io.availe.extensions.isNonHiddenModelAnnotation
+import io.availe.generators.generateInternalSchemasFile
+import io.availe.generators.generatePublicSchemas
+import io.availe.models.DtoVisibility
 import io.availe.models.KReplicaPaths
 import io.availe.models.Model
 import kotlinx.serialization.json.Json
@@ -105,12 +108,26 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
                 "${it.packageName}:${it.isVersionOf}:${it.name}"
             }
             val dependencies = Dependencies(true, *state.sourceSymbols.mapNotNull { it.containingFile }.toTypedArray())
-            KReplicaCodegen.execute(
-                primaryModels = this.state.builtModels,
+
+            KReplicaCodegen.validate(allKnownModels)
+
+            val (internalModels, publicModels) = this.state.builtModels.partition { it.visibility == DtoVisibility.INTERNAL }
+
+            generatePublicSchemas(
+                primaryModels = publicModels,
                 allModels = allKnownModels,
                 codeGenerator = env.codeGenerator,
                 dependencies = dependencies
             )
+
+            if (internalModels.isNotEmpty()) {
+                generateInternalSchemasFile(
+                    primaryModels = internalModels,
+                    allModels = allKnownModels,
+                    codeGenerator = env.codeGenerator,
+                    dependencies = dependencies
+                )
+            }
         } catch (e: Exception) {
             env.logger.error("--- KREPLICA-KSP: Code generation failed with an exception ---\n${e.stackTraceToString()}")
             exitProcess(1)

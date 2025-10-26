@@ -92,6 +92,11 @@ internal fun buildModel(
         )
     }
 
+    val modelVisibility = modelAnnotation.arguments
+        .find { it.name?.asString() == "visibility" }
+        ?.let { DtoVisibility.valueOf((it.value as KSDeclaration).simpleName.asString()) }
+        ?: DtoVisibility.PUBLIC
+
     val annotationConfigs = parseApplyAnnotations(declaration, modelDtoVariants, environment)
     val modelAnnotations = declaration.annotations.toAnnotationModels(frameworkDeclarations)
 
@@ -119,7 +124,17 @@ internal fun buildModel(
         properties.add(schemaVersionProperty)
     }
 
-    val allOptInMarkers = declaration.extractAllOptInMarkers()
+    val modelOptInMarkers = declaration.extractAllOptInMarkers()
+
+    val flattenedMarkers = properties.filterIsInstance<FlattenedProperty>()
+        .mapNotNull {
+            resolver.getClassDeclarationByName(
+                resolver.getKSNameFromString(it.typeInfo.qualifiedName)
+            )
+        }
+        .flatMap { it.extractAllOptInMarkers() }
+
+    val allOptInMarkers = (modelOptInMarkers + flattenedMarkers).distinct()
 
     return Model(
         name = declaration.simpleName.asString(),
@@ -131,6 +146,7 @@ internal fun buildModel(
         optInMarkers = allOptInMarkers,
         isVersionOf = versioningInfo?.baseModelName,
         schemaVersion = versioningInfo?.schemaVersion,
-        autoContextual = modelAutoContextual
+        autoContextual = modelAutoContextual,
+        visibility = modelVisibility
     )
 }

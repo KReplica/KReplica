@@ -7,6 +7,8 @@ internal val REPLICATE_APPLY_ANNOTATION_NAME: String = Replicate.Apply::class.qu
 internal val REPLICATE_PROPERTY_ANNOTATION_NAME: String = Replicate.Property::class.qualifiedName!!
 internal val REPLICATE_SCHEMA_VERSION_ANNOTATION_NAME: String = Replicate.SchemaVersion::class.qualifiedName!!
 internal val REPLICATE_HIDE_ANNOTATION_NAME: String = Replicate.Hide::class.qualifiedName!!
+internal val REPLICATE_FLATTEN_ANNOTATION_NAME: String = Replicate.Flatten::class.qualifiedName!!
+
 internal const val SERIALIZABLE_ANNOTATION_FQN: String = "kotlinx.serialization.Serializable"
 
 internal const val SCHEMA_VERSION_ARG: String = "number"

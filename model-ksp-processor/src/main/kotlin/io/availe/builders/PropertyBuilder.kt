@@ -18,13 +18,14 @@ internal fun processProperty(
     annotationContext: KReplicaAnnotationContext,
     environment: SymbolProcessorEnvironment
 ): Property {
+    val propertyName = propertyDeclaration.simpleName.asString()
+    val parentInterfaceName = (propertyDeclaration.parent as? KSClassDeclaration)?.qualifiedName?.asString() ?: "Unknown Interface"
+
     if (propertyDeclaration.isMutable) {
-        val propertyName = propertyDeclaration.simpleName.asString()
-        val interfaceName = (propertyDeclaration.parent as? KSClassDeclaration)?.simpleName?.asString() ?: "Unknown"
         fail(
             environment,
             """
-            KReplica Validation Error: Property '$propertyName' in interface '$interfaceName' is declared as 'var'.
+            KReplica Validation Error: Property '$propertyName' in interface '$parentInterfaceName' is declared as 'var'.
             Source model interfaces for KReplica must use immutable properties ('val').
             Please change '$propertyName' from 'var' to 'val'.
             """.trimIndent()
@@ -64,14 +65,10 @@ internal fun processProperty(
 
     val ksType = propertyDeclaration.type.resolve()
 
-    when (val validationResult = ksType.validateKReplicaTypeUsage(annotationContext)) {
+    when (val validationResult = ksType.validateKReplicaTypeUsage(annotationContext, propertyDeclaration)) {
         is Invalid -> {
-            val propertyName = propertyDeclaration.simpleName.asString()
-            val parentInterfaceName =
-                (propertyDeclaration.parent as? KSClassDeclaration)?.qualifiedName?.asString() ?: "Unknown Interface"
             val offendingModelName = validationResult.offendingDeclaration.simpleName.asString()
             val suggestedSchemaName = offendingModelName + "Schema"
-
             fail(
                 environment,
                 """
@@ -79,69 +76,76 @@ internal fun processProperty(
                 Property '$propertyName' has an invalid type signature: '${validationResult.fullTypeName}'.
                 The type '$offendingModelName' is a KReplica model interface and cannot be used directly.
 
-                To fix this, replace '$offendingModelName' with the generated schema: '$suggestedSchemaName'.
+                To fix this, replace '$offendingModelName' with the generated schema: '${suggestedSchemaName}'.
+                (Or, if you intend to embed its properties, annotate this property with @Replicate.Flatten and use the generated schema type)
                 """.trimIndent()
             )
         }
-
-        is Valid -> { /* Continue processing */
-        }
+        is Valid -> {}
     }
 
     val typeInfo = KSTypeInfo.from(ksType, environment, resolver).toModelTypeInfo()
     val propertyAnnotations: List<AnnotationModel> =
         propertyDeclaration.annotations.toAnnotationModels(frameworkDeclarations)
 
+    val isFlattened = propertyDeclaration.annotations.any { it.isAnnotation(REPLICATE_FLATTEN_ANNOTATION_NAME) }
+
+    val typeDeclaration = ksType.declaration as? KSClassDeclaration
+    val isModelInterfaceType = typeDeclaration?.annotations?.any { anno ->
+        anno.shortName.asString() == annotationContext.modelAnnotation.simpleName.asString() &&
+                anno.annotationType.resolve().declaration.qualifiedName
+                    ?.asString() == annotationContext.modelAnnotation.qualifiedName?.asString()
+    } == true
+
     val foreignDecl = resolver.getClassDeclarationByName(
         resolver.getKSNameFromString(typeInfo.qualifiedName)
     )
     val isGeneratedForeignModel = foreignDecl.isGeneratedVariantContainer()
 
-    return if (isGeneratedForeignModel && foreignDecl != null) {
-        createForeignProperty(
-            propertyDeclaration,
-            typeInfo,
-            foreignDecl,
-            propertyVariants,
-            propertyAnnotations,
-            finalAutoContextual,
-            environment
-        )
-    } else {
-        RegularProperty(
-            name = propertyDeclaration.simpleName.asString(),
-            typeInfo = typeInfo,
-            dtoVariants = propertyVariants,
-            annotations = propertyAnnotations,
-            autoContextual = finalAutoContextual
-        )
+    return when {
+        isGeneratedForeignModel && foreignDecl != null -> {
+            val versionName = foreignDecl.simpleName.asString()
+            val baseModelDecl = foreignDecl.parentDeclaration as? KSClassDeclaration
+                ?: fail(environment, "Could not determine parent declaration for generated model '${foreignDecl.qualifiedName?.asString()}'")
+            val baseModelName = baseModelDecl.simpleName.asString().removeSuffix(SCHEMA_SUFFIX)
+
+            if (isFlattened) {
+                FlattenedProperty(
+                    name = propertyName, typeInfo = typeInfo, foreignBaseModelName = baseModelName, foreignVersionName = versionName,
+                    dtoVariants = propertyVariants, annotations = propertyAnnotations, autoContextual = finalAutoContextual
+                )
+            } else {
+                ForeignProperty(
+                    name = propertyName, typeInfo = typeInfo, baseModelName = baseModelName, versionName = versionName,
+                    dtoVariants = propertyVariants, annotations = propertyAnnotations, autoContextual = finalAutoContextual
+                )
+            }
+        }
+        isModelInterfaceType -> {
+            if (isFlattened) {
+                fail(
+                    environment,
+                    "KReplica Validation Error in '$parentInterfaceName': Property '$propertyName' uses @Replicate.Flatten with a model interface type '${typeDeclaration.simpleName.asString()}'. " +
+                            "Use the generated schema type ('${typeDeclaration.simpleName.asString()}Schema') with @Replicate.Flatten instead."
+                )
+            } else {
+                fail(
+                    environment,
+                    "KReplica Validation Error in '$parentInterfaceName': Property '$propertyName' uses a model interface type '${typeDeclaration.simpleName.asString()}' directly. Use the generated schema type ('${typeDeclaration.simpleName.asString()}Schema')."
+                )
+            }
+        }
+        else -> {
+            if (isFlattened) {
+                fail(
+                    environment,
+                    "KReplica Validation Error in '$parentInterfaceName': @Replicate.Flatten on property '$propertyName' is invalid. It can only be used on properties referencing a generated KReplica schema (e.g., MyModelSchema.V1)."
+                )
+            }
+            RegularProperty(
+                name = propertyName, typeInfo = typeInfo, dtoVariants = propertyVariants,
+                annotations = propertyAnnotations, autoContextual = finalAutoContextual
+            )
+        }
     }
-}
-
-private fun createForeignProperty(
-    propertyDeclaration: KSPropertyDeclaration,
-    typeInformation: TypeInfo,
-    foreignModelDeclaration: KSClassDeclaration,
-    dtoVariants: Set<DtoVariant>,
-    annotations: List<AnnotationModel>,
-    autoContextual: AutoContextual,
-    environment: SymbolProcessorEnvironment
-): ForeignProperty {
-    val versionName = foreignModelDeclaration.simpleName.asString()
-    val baseModelDecl = foreignModelDeclaration.parentDeclaration as? KSClassDeclaration
-        ?: fail(
-            environment,
-            "Could not determine parent declaration for generated model '${foreignModelDeclaration.qualifiedName?.asString()}'"
-        )
-    val baseModelName = baseModelDecl.simpleName.asString().removeSuffix(SCHEMA_SUFFIX)
-
-    return ForeignProperty(
-        name = propertyDeclaration.simpleName.asString(),
-        typeInfo = typeInformation,
-        baseModelName = baseModelName,
-        versionName = versionName,
-        dtoVariants = dtoVariants,
-        annotations = annotations,
-        autoContextual = autoContextual
-    )
 }

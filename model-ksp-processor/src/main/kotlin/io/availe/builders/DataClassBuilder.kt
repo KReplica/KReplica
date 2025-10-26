@@ -30,8 +30,32 @@ internal fun buildDataTransferObjectClass(
         addModifiers(KModifier.DATA)
         addSuperinterfacesFor(model, dtoVariant)
         addAnnotationsFor(model, dtoVariant)
-        properties.forEach { property ->
-            addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByBaseName)
+
+        val activeProperties = properties.filter { dtoVariant in it.dtoVariants }
+        activeProperties.forEach { property ->
+            when (property) {
+                is FlattenedProperty -> {
+                    val targetModel = modelsByBaseName[property.foreignBaseModelName]
+                        ?.find { it.name == property.foreignVersionName }
+                        ?: error("Could not find model for flattened property: ${property.foreignBaseModelName}.${property.foreignVersionName}")
+
+                    val targetProperties = targetModel.properties.filter { dtoVariant in it.dtoVariants }
+                    targetProperties.forEach { targetProp ->
+                        if (targetProp.name == SCHEMA_VERSION_PROPERTY_NAME) return@forEach
+                        addConfiguredProperty(
+                            constructorBuilder,
+                            targetProp,
+                            model,
+                            dtoVariant,
+                            modelsByBaseName
+                        )
+                    }
+                }
+
+                is ForeignProperty, is RegularProperty -> {
+                    addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByBaseName)
+                }
+            }
         }
         primaryConstructor(constructorBuilder.build())
     }.build()
@@ -39,9 +63,10 @@ internal fun buildDataTransferObjectClass(
 
 private fun TypeSpec.Builder.addSuperinterfacesFor(model: Model, dtoVariant: DtoVariant) {
     if (model.isVersionOf != null) {
+        val packageName = model.packageName
         val schemaName = model.isVersionOf + "Schema"
-        val versionInterface = ClassName(model.packageName, schemaName, model.name)
-        val variantKindInterface = ClassName(model.packageName, schemaName, "${dtoVariant.suffix}Variant")
+        val versionInterface = ClassName(packageName, schemaName, model.name)
+        val variantKindInterface = ClassName(packageName, schemaName, "${dtoVariant.suffix}Variant")
         addSuperinterface(versionInterface)
         addSuperinterface(variantKindInterface)
 

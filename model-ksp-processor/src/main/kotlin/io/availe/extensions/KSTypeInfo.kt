@@ -8,7 +8,7 @@ import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.Modifier
 import io.availe.models.TypeInfo
 
-internal class ResolutionException : Exception()
+internal class ResolutionException(message: String) : Exception(message)
 
 internal data class KSTypeInfo(
     val qualifiedName: String,
@@ -25,7 +25,7 @@ internal data class KSTypeInfo(
         fun from(ksType: KSType, environment: SymbolProcessorEnvironment, resolver: Resolver): KSTypeInfo {
             if (ksType.isError) {
                 val typeName = ksType.declaration.simpleName.asString()
-                throw ResolutionException()
+                throw ResolutionException("KReplica: Cannot resolve type '$typeName'. This often happens if the type is not yet generated, is invalid, or is missing an import.")
             }
 
             val decl = ksType.declaration as KSClassDeclaration
