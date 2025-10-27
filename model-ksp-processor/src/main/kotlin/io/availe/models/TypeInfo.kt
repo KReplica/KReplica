@@ -12,3 +12,9 @@ internal data class TypeInfo(
     val isDataClass: Boolean = false,
     val requiresContextual: Boolean = false
 )
+
+@Serializable
+internal data class SupertypeInfo(
+    val fqn: String,
+    val isSerializable: Boolean
+)

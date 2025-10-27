@@ -28,6 +28,16 @@ internal fun buildDataTransferObjectClass(
     val constructorBuilder = FunSpec.constructorBuilder()
     return TypeSpec.classBuilder(dtoVariant.suffix).apply {
         addModifiers(KModifier.DATA)
+
+        model.supertypes.forEach { supertypeInfo ->
+            val baseClassName = supertypeInfo.fqn.asClassName()
+            addSuperinterface(baseClassName)
+
+            val variantSupertypeFqn = supertypeInfo.fqn + dtoVariant.suffix
+            val variantClassName = variantSupertypeFqn.asClassName()
+            addSuperinterface(variantClassName)
+        }
+
         addSuperinterfacesFor(model, dtoVariant)
         addAnnotationsFor(model, dtoVariant)
 

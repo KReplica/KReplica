@@ -14,6 +14,7 @@ import io.availe.extensions.getFrameworkDeclarations
 import io.availe.extensions.isNonHiddenModelAnnotation
 import io.availe.generators.generateInternalSchemasFile
 import io.availe.generators.generatePublicSchemas
+import io.availe.generators.generateSupertypesFile
 import io.availe.models.DtoVisibility
 import io.availe.models.KReplicaPaths
 import io.availe.models.Model
@@ -108,6 +109,12 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
                 "${it.packageName}:${it.isVersionOf}:${it.name}"
             }
             val dependencies = Dependencies(true, *state.sourceSymbols.mapNotNull { it.containingFile }.toTypedArray())
+
+            generateSupertypesFile(
+                models = allKnownModels,
+                codeGenerator = env.codeGenerator,
+                dependencies = dependencies
+            )
 
             KReplicaCodegen.validate(allKnownModels)
 

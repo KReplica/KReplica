@@ -10,8 +10,9 @@ object Replicate {
     annotation class Model(
         val variants: Array<DtoVariant>,
         val autoContextual: AutoContextual = AutoContextual.ENABLED,
-        val visibility: DtoVisibility = DtoVisibility.PUBLIC
-        )
+        val visibility: DtoVisibility = DtoVisibility.PUBLIC,
+        val supertypes: Array<KClass<*>> = []
+    )
 
     @Target(AnnotationTarget.PROPERTY)
     annotation class Property(

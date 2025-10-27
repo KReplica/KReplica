@@ -20,7 +20,8 @@ internal data class Model(
     val isVersionOf: String? = null,
     val schemaVersion: Int? = null,
     val autoContextual: AutoContextual = AutoContextual.ENABLED,
-    val visibility: DtoVisibility = DtoVisibility.PUBLIC
+    val visibility: DtoVisibility = DtoVisibility.PUBLIC,
+    val supertypes: List<SupertypeInfo> = emptyList()
 ) {
     init {
         require(properties.isNotEmpty()) {

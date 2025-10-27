@@ -97,6 +97,23 @@ internal fun buildModel(
         ?.let { DtoVisibility.valueOf((it.value as KSDeclaration).simpleName.asString()) }
         ?: DtoVisibility.PUBLIC
 
+    val supertypesArgument = modelAnnotation.arguments
+        .find { it.name?.asString() == "supertypes" }
+        ?.value as? List<*>
+
+    val supertypeInfos = supertypesArgument
+        ?.mapNotNull { it as? KSType }
+        ?.filter { it.declaration.qualifiedName?.asString() != "kotlin.Nothing" }
+        ?.map { ksType ->
+            val decl = ksType.declaration as KSClassDeclaration
+            val fqn = decl.qualifiedName!!.asString()
+            val isSerializable = decl.annotations.any {
+                it.annotationType.resolve().declaration.qualifiedName?.asString() == SERIALIZABLE_ANNOTATION_FQN
+            }
+            SupertypeInfo(fqn = fqn, isSerializable = isSerializable)
+        }
+        ?: emptyList()
+
     val annotationConfigs = parseApplyAnnotations(declaration, modelDtoVariants, environment)
     val modelAnnotations = declaration.annotations.toAnnotationModels(frameworkDeclarations)
 
@@ -147,6 +164,7 @@ internal fun buildModel(
         isVersionOf = versioningInfo?.baseModelName,
         schemaVersion = versioningInfo?.schemaVersion,
         autoContextual = modelAutoContextual,
-        visibility = modelVisibility
+        visibility = modelVisibility,
+        supertypes = supertypeInfos
     )
 }

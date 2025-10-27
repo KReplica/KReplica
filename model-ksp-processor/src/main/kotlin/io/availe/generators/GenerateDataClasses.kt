@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import io.availe.SCHEMA_SUFFIX
 import io.availe.SERIALIZABLE_QUALIFIED_NAME
+import io.availe.builders.asClassName
 import io.availe.builders.buildAnnotationSpec
 import io.availe.builders.buildDataTransferObjectClass
 import io.availe.builders.overwriteFile
@@ -109,9 +110,13 @@ private fun buildVersionedSchema(
     val isGloballySerializable =
         representativeModel.annotationConfigs.any { it.annotation.qualifiedName == SERIALIZABLE_QUALIFIED_NAME }
     val packageName = representativeModel.packageName
+    val supertypesFqns = representativeModel.supertypes
 
     return TypeSpec.interfaceBuilder(schemaFileName).apply {
         addModifiers(KModifier.SEALED, visibility)
+        supertypesFqns.forEach {
+            addSuperinterface(it.fqn.asClassName()) // Fixed line
+        }
 
         if (isGloballySerializable) {
             addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
@@ -155,9 +160,13 @@ private fun buildUnversionedSchema(
     val schemaInterfaceName = ClassName(model.packageName, schemaFileName)
     val isGloballySerializable =
         model.annotationConfigs.any { it.annotation.qualifiedName == SERIALIZABLE_QUALIFIED_NAME }
+    val supertypesFqns = model.supertypes
 
     return TypeSpec.interfaceBuilder(schemaInterfaceName).apply {
         addModifiers(KModifier.SEALED, visibility)
+        supertypesFqns.forEach {
+            addSuperinterface(it.fqn.asClassName()) // Fixed line
+        }
 
         addKdoc("A sealed hierarchy representing all variants of the %L data model.", baseName)
         model.annotations.forEach { addAnnotation(buildAnnotationSpec(it)) }

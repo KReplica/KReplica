@@ -112,8 +112,22 @@ private fun buildSchemaStub(
     val schemaClassName = ClassName(packageName, schemaFileName)
     val isGloballySerializable = versions.any { isModelSerializable(it) }
 
+    val modelAnnotation = representativeModel.annotations.first { it.isAnnotation(MODEL_ANNOTATION_NAME) }
+    val supertypesArgument = modelAnnotation.arguments
+        .find { it.name?.asString() == "supertypes" }
+        ?.value as? List<*>
+
+    val supertypesClassNames = supertypesArgument
+        ?.mapNotNull { it as? KSType }
+        ?.filter { it.declaration.qualifiedName?.asString() != "kotlin.Nothing" }
+        ?.map { it.declaration.qualifiedName!!.asString().asClassName() }
+        ?: emptyList()
+
     return TypeSpec.interfaceBuilder(schemaClassName).apply {
         addModifiers(KModifier.SEALED, modifier)
+        supertypesClassNames.forEach {
+            addSuperinterface(it)
+        }
         if (isGloballySerializable) {
             addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
         }
