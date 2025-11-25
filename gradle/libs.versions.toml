@@ -14,7 +14,7 @@ kotlin-poet-meta = "1.9.0"
 android-compileSdk = "35"
 android-minSdk = "21"
 android-targetSdk = "35"
-vanniktech = "0.34.0"
+vanniktech = "0.35.0"
 
 [libraries]
 arrow-core = { module = "io.arrow-kt:arrow-core", version.ref = "arrow" }
