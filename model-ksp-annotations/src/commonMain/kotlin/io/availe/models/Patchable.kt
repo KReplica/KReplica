@@ -6,9 +6,9 @@ import kotlinx.serialization.Serializable
  * Used by generated PATCH request code to mark fields as updated or unchanged.
  * Use Set(value) to update a field, or Unchanged to leave it as-is.
  */
-sealed class Patchable<out T> {
-    data class Set<out T>(val value: T) : Patchable<T>()
-    data object Unchanged : Patchable<Nothing>()
+sealed interface Patchable<out T> {
+    data class Set<out T>(val value: T) : Patchable<T>
+    data object Unchanged : Patchable<Nothing>
 }
 
 /**
@@ -16,10 +16,10 @@ sealed class Patchable<out T> {
  * Use Set(value) to update a field, or Unchanged to leave it as-is.
  */
 @Serializable
-sealed class SerializablePatchable<out T> {
+sealed interface SerializablePatchable<out T> {
     @Serializable
-    data class Set<out T>(val value: T) : SerializablePatchable<T>()
+    data class Set<out T>(val value: T) : SerializablePatchable<T>
 
     @Serializable
-    data object Unchanged : SerializablePatchable<Nothing>()
+    data object Unchanged : SerializablePatchable<Nothing>
 }
