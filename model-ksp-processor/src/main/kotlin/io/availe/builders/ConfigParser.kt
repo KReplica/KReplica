@@ -2,7 +2,10 @@ package io.availe.builders
 
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import io.availe.extensions.*
+import io.availe.extensions.KREPLICA_SERIALIZATION_CONFIG_INTERFACE
+import io.availe.extensions.REPLICATE_CONFIG_ANNOTATION_NAME
+import io.availe.extensions.REPLICATE_TYPE_SERIALIZER_ANNOTATION_NAME
+import io.availe.extensions.isAnnotation
 import io.availe.models.SerializerMapping
 
 internal fun Resolver.getGlobalSerializerMappings(): Map<String, SerializerMapping> {
@@ -38,15 +41,6 @@ internal fun extractSerializerMappings(declaration: KSAnnotated): Map<String, Se
         if (annotation.isAnnotation(REPLICATE_TYPE_SERIALIZER_ANNOTATION_NAME)) {
             parseTypeSerializerAnnotation(annotation)?.let {
                 mappings[it.typeFqn] = it
-            }
-        } else if (annotation.isAnnotation(REPLICATE_SERIALIZERS_ANNOTATION_NAME)) {
-            val values = annotation.arguments.find { it.name?.asString() == "value" }?.value as? List<*>
-            values?.forEach { item ->
-                (item as? KSAnnotation)?.let { nested ->
-                    parseTypeSerializerAnnotation(nested)?.let {
-                        mappings[it.typeFqn] = it
-                    }
-                }
             }
         }
     }

@@ -44,10 +44,5 @@ object Replicate {
     )
 
     @Target(AnnotationTarget.CLASS)
-    annotation class Serializers(
-        val value: Array<TypeSerializer>
-    )
-
-    @Target(AnnotationTarget.CLASS)
     annotation class Config
 }

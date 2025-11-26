@@ -130,7 +130,6 @@ internal fun getFrameworkDeclarations(resolver: Resolver): Set<KSClassDeclaratio
         REPLICATE_HIDE_ANNOTATION_NAME,
         REPLICATE_FLATTEN_ANNOTATION_NAME,
         REPLICATE_CONFIG_ANNOTATION_NAME,
-        REPLICATE_SERIALIZERS_ANNOTATION_NAME,
         REPLICATE_TYPE_SERIALIZER_ANNOTATION_NAME
     )
         .mapNotNull { fullyQualifiedName ->
