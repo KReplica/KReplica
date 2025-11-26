@@ -38,11 +38,13 @@ internal fun resolveTypeNameForProperty(
 
 private fun buildSimpleTypeName(typeInfo: TypeInfo): TypeName {
     val rawType = typeInfo.qualifiedName.asClassName()
-    if (typeInfo.arguments.isEmpty()) {
-        return rawType.copy(nullable = typeInfo.isNullable)
+    val finalType = if (typeInfo.arguments.isEmpty()) {
+        rawType.copy(nullable = typeInfo.isNullable)
+    } else {
+        val typeArguments = typeInfo.arguments.map { buildSimpleTypeName(it) }
+        rawType.parameterizedBy(typeArguments).copy(nullable = typeInfo.isNullable)
     }
-    val typeArguments = typeInfo.arguments.map { buildSimpleTypeName(it) }
-    return rawType.parameterizedBy(typeArguments).copy(nullable = typeInfo.isNullable)
+    return finalType.applyAnnotations(typeInfo)
 }
 
 internal fun buildRecursiveDtoTypeName(
@@ -56,13 +58,13 @@ internal fun buildRecursiveDtoTypeName(
         ?.find { it.name == property.versionName }
         ?: error("KReplica Error: Could not resolve foreign model for baseName='${property.baseModelName}' and versionName='${property.versionName}'.")
 
-    if (typeInfo.arguments.isEmpty()) {
+    val finalType = if (typeInfo.arguments.isEmpty()) {
         val finalDtoName = if (targetModel.isVersionOf != null) {
             ClassName(targetModel.packageName, "${targetModel.isVersionOf}Schema", targetModel.name, dtoVariant.suffix)
         } else {
             ClassName(targetModel.packageName, "${targetModel.name}Schema", dtoVariant.suffix)
         }
-        return finalDtoName.copy(nullable = typeInfo.isNullable)
+        finalDtoName.copy(nullable = typeInfo.isNullable)
     } else {
         val rawType = typeInfo.qualifiedName.asClassName()
         val transformedArgs = typeInfo.arguments.map { arg ->
@@ -72,8 +74,9 @@ internal fun buildRecursiveDtoTypeName(
                 modelsByBaseName
             )
         }
-        return rawType.parameterizedBy(transformedArgs).copy(nullable = typeInfo.isNullable)
+        rawType.parameterizedBy(transformedArgs).copy(nullable = typeInfo.isNullable)
     }
+    return finalType.applyAnnotations(typeInfo)
 }
 
 private fun buildRecursiveDtoTypeName(
@@ -86,24 +89,30 @@ private fun buildRecursiveDtoTypeName(
 
     val targetModel = modelsByBaseName[lookupKey]?.firstOrNull()
 
-    if (typeInfo.arguments.isEmpty()) {
+    val finalType = if (typeInfo.arguments.isEmpty()) {
         if (targetModel == null) {
-            return typeInfo.toTypeName()
-        }
-
-        val finalDtoName = if (targetModel.isVersionOf != null) {
-            ClassName(targetModel.packageName, "${targetModel.isVersionOf}Schema", targetModel.name, dtoVariant.suffix)
+            typeInfo.toTypeName()
         } else {
-            ClassName(targetModel.packageName, "${targetModel.name}Schema", dtoVariant.suffix)
+            val finalDtoName = if (targetModel.isVersionOf != null) {
+                ClassName(
+                    targetModel.packageName,
+                    "${targetModel.isVersionOf}Schema",
+                    targetModel.name,
+                    dtoVariant.suffix
+                )
+            } else {
+                ClassName(targetModel.packageName, "${targetModel.name}Schema", dtoVariant.suffix)
+            }
+            finalDtoName.copy(nullable = typeInfo.isNullable)
         }
-        return finalDtoName.copy(nullable = typeInfo.isNullable)
     } else {
         val rawType = typeInfo.qualifiedName.asClassName()
         val transformedArgs = typeInfo.arguments.map { arg ->
             buildRecursiveDtoTypeName(arg, dtoVariant, modelsByBaseName)
         }
-        return rawType.parameterizedBy(transformedArgs).copy(nullable = typeInfo.isNullable)
+        rawType.parameterizedBy(transformedArgs).copy(nullable = typeInfo.isNullable)
     }
+    return finalType.applyAnnotations(typeInfo)
 }
 
 
@@ -118,9 +127,15 @@ private fun buildTypeNameRecursive(
 
     val parameterizedType = if (typeArguments.isEmpty()) rawType else rawType.parameterizedBy(typeArguments)
 
-    return parameterizedType.copy(nullable = typeInfo.isNullable)
+    return parameterizedType.copy(nullable = typeInfo.isNullable).applyAnnotations(typeInfo)
 }
 
 internal fun TypeInfo.toTypeName(): TypeName {
     return buildTypeNameRecursive(this)
+}
+
+private fun TypeName.applyAnnotations(typeInfo: TypeInfo): TypeName {
+    if (typeInfo.annotations.isEmpty()) return this
+    val specs = typeInfo.annotations.map { buildAnnotationSpec(it) }
+    return this.copy(annotations = this.annotations + specs)
 }

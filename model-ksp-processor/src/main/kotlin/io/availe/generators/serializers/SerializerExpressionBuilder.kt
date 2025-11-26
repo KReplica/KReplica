@@ -1,7 +1,6 @@
 package io.availe.generators.serializers
 
 import com.squareup.kotlinpoet.*
-import io.availe.builders.asClassName
 
 internal object SerializerExpressionBuilder {
     private val LIST_SERIALIZER = MemberName("kotlinx.serialization.builtins", "ListSerializer")
@@ -13,56 +12,39 @@ internal object SerializerExpressionBuilder {
     private const val SET_FQN = "kotlin.collections.Set"
     private const val MAP_FQN = "kotlin.collections.Map"
 
-    fun build(typeName: TypeName, mappings: Map<String, SerializerMapping>): CodeBlock {
-        val rawFqn = when (typeName) {
-            is ClassName -> typeName.canonicalName
-            is ParameterizedTypeName -> typeName.rawType.canonicalName
-            else -> ""
-        }
+    fun build(typeName: TypeName): CodeBlock {
+        val baseExpression = when (typeName) {
+            is ParameterizedTypeName -> {
+                when (typeName.rawType.canonicalName) {
+                    LIST_FQN -> {
+                        val elementSerializer = build(typeName.typeArguments[0])
+                        CodeBlock.of("%M(%L)", LIST_SERIALIZER, elementSerializer)
+                    }
 
-        val mapping = mappings[rawFqn]
+                    SET_FQN -> {
+                        val elementSerializer = build(typeName.typeArguments[0])
+                        CodeBlock.of("%M(%L)", SET_SERIALIZER, elementSerializer)
+                    }
 
-        val baseExpression = if (mapping != null) {
-            val serializerClassName = mapping.serializerFqn.asClassName()
-            if (mapping.isSerializerObject) {
-                CodeBlock.of("%T", serializerClassName)
-            } else {
-                CodeBlock.of("%T()", serializerClassName)
-            }
-        } else {
-            when (typeName) {
-                is ParameterizedTypeName -> {
-                    when (typeName.rawType.canonicalName) {
-                        LIST_FQN -> {
-                            val elementSerializer = build(typeName.typeArguments[0], mappings)
-                            CodeBlock.of("%M(%L)", LIST_SERIALIZER, elementSerializer)
-                        }
+                    MAP_FQN -> {
+                        val keySerializer = build(typeName.typeArguments[0])
+                        val valueSerializer = build(typeName.typeArguments[1])
+                        CodeBlock.of("%M(%L, %L)", MAP_SERIALIZER, keySerializer, valueSerializer)
+                    }
 
-                        SET_FQN -> {
-                            val elementSerializer = build(typeName.typeArguments[0], mappings)
-                            CodeBlock.of("%M(%L)", SET_SERIALIZER, elementSerializer)
-                        }
-
-                        MAP_FQN -> {
-                            val keySerializer = build(typeName.typeArguments[0], mappings)
-                            val valueSerializer = build(typeName.typeArguments[1], mappings)
-                            CodeBlock.of("%M(%L, %L)", MAP_SERIALIZER, keySerializer, valueSerializer)
-                        }
-
-                        else -> {
-                            val args = typeName.typeArguments.map { build(it, mappings) }
-                            val argsFormat = args.joinToString(", ") { "%L" }
-                            CodeBlock.of("%T.serializer($argsFormat)", typeName.rawType)
-                        }
+                    else -> {
+                        val args = typeName.typeArguments.map { build(it) }
+                        val argsFormat = args.joinToString(", ") { "%L" }
+                        CodeBlock.of("%T.serializer($argsFormat)", typeName.rawType)
                     }
                 }
-
-                is ClassName -> {
-                    CodeBlock.of("%T.serializer()", typeName.copy(nullable = false))
-                }
-
-                else -> error("Unsupported TypeName for serializer generation: $typeName")
             }
+
+            is ClassName -> {
+                CodeBlock.of("%T.serializer()", typeName.copy(nullable = false))
+            }
+
+            else -> error("Unsupported TypeName for serializer generation: $typeName")
         }
 
         return if (typeName.isNullable) {

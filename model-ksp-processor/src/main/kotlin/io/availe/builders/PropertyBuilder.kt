@@ -75,7 +75,7 @@ internal fun processProperty(
         is Valid -> {}
     }
 
-    val typeInfo = KSTypeInfo.from(ksType, environment, resolver).toModelTypeInfo()
+    val typeInfo = KSTypeInfo.from(ksType, environment, resolver, frameworkDeclarations).toModelTypeInfo()
     val propertyAnnotations: List<AnnotationModel> =
         propertyDeclaration.annotations.toAnnotationModels(frameworkDeclarations)
 

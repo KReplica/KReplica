@@ -9,7 +9,8 @@ internal data class TypeInfo(
     val isNullable: Boolean = false,
     val isEnum: Boolean = false,
     val isValueClass: Boolean = false,
-    val isDataClass: Boolean = false
+    val isDataClass: Boolean = false,
+    val annotations: List<AnnotationModel> = emptyList()
 )
 
 @Serializable

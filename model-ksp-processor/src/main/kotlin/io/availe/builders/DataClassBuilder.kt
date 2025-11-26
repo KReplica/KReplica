@@ -107,23 +107,11 @@ private fun TypeSpec.Builder.addConfiguredProperty(
     val typeName = resolveTypeNameForProperty(property, dtoVariant, model, modelsByBaseName, isContainerSerializable)
 
     val paramBuilder = ParameterSpec.builder(property.name, typeName).apply {
-        val mapping = model.typeSerializers[property.typeInfo.qualifiedName]
-        val hasExplicitMapping = mapping != null
-
         val annotationsToApply = property.annotations
             .filterNot { it.qualifiedName == OPT_IN_QUALIFIED_NAME }
-            .filterNot { hasExplicitMapping && it.qualifiedName == "kotlinx.serialization.Contextual" }
 
         annotationsToApply.forEach { annotationModel ->
             addAnnotation(buildAnnotationSpec(annotationModel))
-        }
-
-        if (dtoVariant != DtoVariant.PATCH && hasExplicitMapping) {
-            val serializerClassName = mapping!!.serializerFqn.asClassName()
-            val annotation = AnnotationSpec.builder(ClassName("kotlinx.serialization", "Serializable"))
-                .addMember("with = %T::class", serializerClassName)
-                .build()
-            addAnnotation(annotation)
         }
 
         if (property.name == SCHEMA_VERSION_PROPERTY_NAME && dtoVariant != DtoVariant.PATCH) {
@@ -132,7 +120,7 @@ private fun TypeSpec.Builder.addConfiguredProperty(
 
         if (dtoVariant == DtoVariant.PATCH) {
             val baseType = resolvePropertyBaseType(property, dtoVariant, modelsByBaseName)
-            val serializerName = collector.getOrRegister(baseType, model.typeSerializers)
+            val serializerName = collector.getOrRegister(baseType)
             addAnnotation(
                 AnnotationSpec.builder(ClassName("kotlinx.serialization", "Serializable"))
                     .addMember("with = %T::class", serializerName)

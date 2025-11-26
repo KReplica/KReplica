@@ -16,8 +16,8 @@ internal class PatchSerializerCollector(
 
     fun generatedSerializers(): List<TypeSpec> = _generatedSerializers
 
-    fun getOrRegister(typeName: TypeName, mappings: Map<String, SerializerMapping>): ClassName {
-        val serializerExpression = SerializerExpressionBuilder.build(typeName, mappings)
+    fun getOrRegister(typeName: TypeName): ClassName {
+        val serializerExpression = SerializerExpressionBuilder.build(typeName)
         val cacheKey = "$typeName::$serializerExpression"
 
         return cache.getOrPut(cacheKey) {

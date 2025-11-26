@@ -16,12 +16,18 @@ internal data class KSTypeInfo(
     val isNullable: Boolean,
     val isEnum: Boolean,
     val isValueClass: Boolean,
-    val isDataClass: Boolean
+    val isDataClass: Boolean,
+    val annotations: List<io.availe.models.AnnotationModel>
 ) {
     companion object {
         private const val JVM_INLINE_ANNOTATION_FQN = "kotlin.jvm.JvmInline"
 
-        fun from(ksType: KSType, environment: SymbolProcessorEnvironment, resolver: Resolver): KSTypeInfo {
+        fun from(
+            ksType: KSType,
+            environment: SymbolProcessorEnvironment,
+            resolver: Resolver,
+            frameworkDeclarations: Set<KSClassDeclaration>
+        ): KSTypeInfo {
             if (ksType.isError) {
                 val typeName = ksType.declaration.simpleName.asString()
                 throw ResolutionException("KReplica: Cannot resolve type '$typeName'. This often happens if the type is not yet generated, is invalid, or is missing an import.")
@@ -31,8 +37,9 @@ internal data class KSTypeInfo(
             val qualified = decl.qualifiedName?.asString()
                 ?: throw IllegalStateException("Failed to get qualified name for declaration '${decl.simpleName.asString()}'")
 
-            val args =
-                ksType.arguments.mapNotNull { it.type?.resolve()?.let { type -> from(type, environment, resolver) } }
+            val args = ksType.arguments.mapNotNull {
+                it.type?.resolve()?.let { type -> from(type, environment, resolver, frameworkDeclarations) }
+            }
             val nullable = ksType.isMarkedNullable
             val isEnum = decl.classKind == ClassKind.ENUM_CLASS
             val isData = decl.modifiers.contains(Modifier.DATA)
@@ -43,7 +50,9 @@ internal data class KSTypeInfo(
             }
             val isValue = isValueByModifier || isValueByAnnotation
 
-            return KSTypeInfo(qualified, args, nullable, isEnum, isValue, isData)
+            val annotations = ksType.annotations.toAnnotationModels(frameworkDeclarations)
+
+            return KSTypeInfo(qualified, args, nullable, isEnum, isValue, isData, annotations)
         }
     }
 }
@@ -55,5 +64,6 @@ internal fun KSTypeInfo.toModelTypeInfo(): TypeInfo =
         isNullable = isNullable,
         isEnum = isEnum,
         isValueClass = isValueClass,
-        isDataClass = isDataClass
+        isDataClass = isDataClass,
+        annotations = annotations
     )

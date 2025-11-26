@@ -8,12 +8,17 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import io.availe.builders.buildModel
 import io.availe.builders.generateStubs
-import io.availe.builders.getGlobalSerializerMappings
-import io.availe.extensions.*
+import io.availe.extensions.KReplicaAnnotationContext
+import io.availe.extensions.MODEL_ANNOTATION_NAME
+import io.availe.extensions.getFrameworkDeclarations
+import io.availe.extensions.isNonHiddenModelAnnotation
 import io.availe.generators.generateInternalSchemasFile
 import io.availe.generators.generatePublicSchemas
 import io.availe.generators.generateSupertypesFile
-import io.availe.models.*
+import io.availe.models.DtoVisibility
+import io.availe.models.KReplicaPaths
+import io.availe.models.Model
+import io.availe.models.ModuleMetadata
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.OutputStreamWriter
@@ -46,9 +51,6 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
             }
 
         state.upstreamModels.addAll(loadedMetadata.flatMap { it.models })
-        loadedMetadata.forEach { metadata ->
-            state.upstreamSerializers.putAll(metadata.exportedSerializers)
-        }
         state.initialized = true
     }
 
@@ -70,16 +72,12 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
             .filter { it.isNonHiddenModelAnnotation() }
             .toList()
 
-        val configSymbols = resolver
-            .getSymbolsWithAnnotation(REPLICATE_CONFIG_ANNOTATION_NAME)
-            .toList()
-
         if (modelSymbols.isNotEmpty()) {
             generateStubs(modelSymbols, env)
         }
 
         state.round = ProcessingState.ProcessingRound.SECOND
-        return modelSymbols + configSymbols
+        return modelSymbols
     }
 
     private fun processModels(resolver: Resolver): List<KSAnnotated> {
@@ -88,8 +86,6 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
             .filterIsInstance<KSClassDeclaration>()
             .filter { it.isNonHiddenModelAnnotation() }
             .toList()
-
-        val globalSerializers = resolver.getGlobalSerializerMappings()
 
         val modelAnnotationDeclaration =
             resolver.getClassDeclarationByName(resolver.getKSNameFromString(MODEL_ANNOTATION_NAME))
@@ -103,14 +99,11 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
                 resolver,
                 frameworkDecls,
                 annotationContext,
-                env,
-                state.upstreamSerializers,
-                globalSerializers
+                env
             )
         }
         this.state.builtModels.addAll(builtModels)
         this.state.sourceSymbols.addAll(modelSymbols)
-        this.state.globalSerializers = globalSerializers
         return emptyList()
     }
 
@@ -157,19 +150,16 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
 
         writeModelsToFile(
             this.state.builtModels,
-            this.state.sourceSymbols.toList(),
-            this.state.globalSerializers
+            this.state.sourceSymbols.toList()
         )
     }
 
     private fun writeModelsToFile(
         models: List<Model>,
-        sourceSymbols: List<KSClassDeclaration>,
-        exportedSerializers: Map<String, SerializerMapping>
+        sourceSymbols: List<KSClassDeclaration>
     ) {
         val metadata = ModuleMetadata(
-            models = models,
-            exportedSerializers = exportedSerializers
+            models = models
         )
         val jsonText = jsonPrettyPrinter.encodeToString(metadata)
         val sourceFiles = sourceSymbols.mapNotNull { it.containingFile }.distinct().toTypedArray()
@@ -184,8 +174,6 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
         val sourceSymbols = mutableSetOf<KSClassDeclaration>()
         var round = ProcessingRound.FIRST
         val upstreamModels = mutableListOf<Model>()
-        val upstreamSerializers = mutableMapOf<String, SerializerMapping>()
-        var globalSerializers = mapOf<String, SerializerMapping>()
         var initialized = false
 
         enum class ProcessingRound {
