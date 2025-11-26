@@ -2,7 +2,8 @@
 
 KReplica is a DTO generator for KMP and Kotlin JVM. It runs automatically during Kotlin compilation.
 
-Also check out the new [website](https://kreplica.availe.io) for KReplica. The documentation site is currently more up-to-date than the README; except the fact that it currently does not cover the nested contextual feature.
+Also check out the new [website](https://kreplica.availe.io) for KReplica. The documentation site is currently more
+up-to-date than the README; except the fact that it currently does not cover the nested contextual feature.
 
 ### Features:
 
@@ -23,24 +24,25 @@ Add the KSP and KReplica plugins to your module's `build.gradle.kts`:
 ```kotlin
 plugins {
     id("com.google.devtools.ksp") version "2.2.10-2.0.2" // Use a KSP version that matches your Kotlin version
-    id("io.availe.kreplica") version "5.2.0"
+    id("io.availe.kreplica") version "5.3.0"
 }
 ```
 
 ## A quick note on sealed hierarchies
 
-KReplica generates sealed interfaces, allowing you to leverage exhaustive `when` expressions for robust and type-safe code. This makes handling different versions or variants straightforward and ensures you don't miss cases.
+KReplica generates sealed interfaces, allowing you to leverage exhaustive `when` expressions for robust and type-safe
+code. This makes handling different versions or variants straightforward and ensures you don't miss cases.
 
 In **example 2 (versioned schema)**, if you check the generated code, here is a short snippet of what you will see:
 
 ```kotlin
     public sealed interface V2 : UserAccountSchema {
-        public data class Data(
-            public val id: Int,
-            public val name: String,
-            public val schemaVersion: Int = 2,
-        ) : V2,
-            DataVariant
+    public data class Data(
+        public val id: Int,
+        public val name: String,
+        public val schemaVersion: Int = 2,
+    ) : V2,
+        DataVariant
 ```
 
 This code snippet might seem a bit complex for a single DTO, but it's key to the examples below:
@@ -92,6 +94,7 @@ fun handleUser(user: UserAccountSchema.V1.Data) {
 **Note 1:** KReplica generates all output files in your module’s `build/generated-src/kotlin-poet/` directory.
 
 **Note 2:** 90% of what you need to know to utilize KReplica is covered by the first two examples:
+
 - `Replicate.Model` and `Replicate.Property` (example 1)
 - Versioned schemas (example 2)
 
@@ -102,31 +105,30 @@ This example covers how to use the `Replicate.Model` and `Replicate.Property` an
 ```kotlin
 @OptIn(ExperimentalUuidApi::class)
 @Replicate.Model(
-  variants = [DtoVariant.DATA, DtoVariant.CREATE, DtoVariant.PATCH], // required argument
-  nominalTyping = NominalTyping.ENABLED // disabled by default
+    variants = [DtoVariant.DATA, DtoVariant.CREATE, DtoVariant.PATCH], // required argument
+    nominalTyping = NominalTyping.ENABLED // disabled by default
 )
 private interface UserAccount {
-  // This property inherits all of @Replicate.Model's arguments
-  val emailAddress: String
+    // This property inherits all of @Replicate.Model's arguments
+    val emailAddress: String
 
-  // This property is only included in the DATA variant
-  @Replicate.Property(include = [DtoVariant.DATA])
-  val id: Uuid
+    // This property is only included in the DATA variant
+    @Replicate.Property(include = [DtoVariant.DATA])
+    val id: Uuid
 
-  // This property is excluded from the CREATE variant
-  @Replicate.Property(exclude = [DtoVariant.CREATE])
-  val banReason: Patchable<List<String?>>
+    // This property is excluded from the CREATE variant
+    @Replicate.Property(exclude = [DtoVariant.CREATE])
+    val banReason: Patchable<List<String?>>
 
-  // We opt out of nominalTyping for this property
-  @Replicate.Property(nominalTyping = NominalTyping.DISABLED)
-  val userDescription: String?
+    // We opt out of nominalTyping for this property
+    @Replicate.Property(nominalTyping = NominalTyping.DISABLED)
+    val userDescription: String?
 }
 ```
 
 See the [generated code](docs/EXAMPLES.md#example-non-versioned).
 
 See the [patchable file](docs/EXAMPLES.md#patchable)
-
 
 ## Example (versioned)
 
@@ -213,19 +215,19 @@ private interface UserAccount // this is a versioned schema declaration
 @Replicate.Model(variants = [DtoVariant.DATA], autoContextual = AutoContextual.DISABLED)
 @Replicate.Apply([Serializable::class])
 private interface V1 : UserAccount {
-  val id: Int
+    val id: Int
 
-  // here we manually apply contextual, as it inherits the model's AutoContextual.DISABLED
-  @Contextual
-  val startTime: Instant
+    // here we manually apply contextual, as it inherits the model's AutoContextual.DISABLED
+    @Contextual
+    val startTime: Instant
 
-  // here we manually specify which serializer we want to use
-  @Serializable(with = InstantAsStringSerializer::class)
-  val midTime: Instant
+    // here we manually specify which serializer we want to use
+    @Serializable(with = InstantAsStringSerializer::class)
+    val midTime: Instant
 
-  // here we override autoContextual to be ENABLED and let KReplica apply it automatically
-  @Replicate.Property(autoContextual = AutoContextual.ENABLED)
-  val endTime: List<List<Instant>>
+    // here we override autoContextual to be ENABLED and let KReplica apply it automatically
+    @Replicate.Property(autoContextual = AutoContextual.ENABLED)
+    val endTime: List<List<Instant>>
 }
 ```
 
@@ -260,14 +262,20 @@ private interface UserAccount {
 
 ## Contextual nested models
 
-Note: Nested Contextuals only work for KReplica declaration that all reside within the same module. Adding multi-module support is possible, since each module creates a separate `models.json` file, which in theory could be merged for processing. However, it is not currently a priority for me, as I typically declare all my KReplica DTO's within a shared module that connects the client and server modules.
+Note: Nested Contextuals only work for KReplica declaration that all reside within the same module. Adding multi-module
+support is possible, since each module creates a separate `models.json` file, which in theory could be merged for
+processing. However, it is not currently a priority for me, as I typically declare all my KReplica DTO's within a shared
+module that connects the client and server modules.
 
 Say that you previously defined `UserAccount`:
 
 ```kotlin
 private interface UserAccount
 
-@Replicate.Model(variants = [DtoVariant.DATA, DtoVariant.CREATE, DtoVariant.PATCH], nominalTyping = NominalTyping.ENABLED)
+@Replicate.Model(
+    variants = [DtoVariant.DATA, DtoVariant.CREATE, DtoVariant.PATCH],
+    nominalTyping = NominalTyping.ENABLED
+)
 private interface V1 : UserAccount {
     val id: Int
 }
