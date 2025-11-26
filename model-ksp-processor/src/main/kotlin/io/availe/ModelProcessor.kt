@@ -8,16 +8,12 @@ import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSClassDeclaration
 import io.availe.builders.buildModel
 import io.availe.builders.generateStubs
-import io.availe.extensions.KReplicaAnnotationContext
-import io.availe.extensions.MODEL_ANNOTATION_NAME
-import io.availe.extensions.getFrameworkDeclarations
-import io.availe.extensions.isNonHiddenModelAnnotation
+import io.availe.builders.getGlobalSerializerMappings
+import io.availe.extensions.*
 import io.availe.generators.generateInternalSchemasFile
 import io.availe.generators.generatePublicSchemas
 import io.availe.generators.generateSupertypesFile
-import io.availe.models.DtoVisibility
-import io.availe.models.KReplicaPaths
-import io.availe.models.Model
+import io.availe.models.*
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.OutputStreamWriter
@@ -33,22 +29,26 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
         val metadataPaths = env.options["kreplica.metadataFiles"]?.split(File.pathSeparator)
             ?.filter { it.isNotBlank() } ?: emptyList()
 
-        val loadedModels = metadataPaths
+        val loadedMetadata = metadataPaths
             .map { path -> File(path) }
             .filter { file -> file.name == KReplicaPaths.MODELS_JSON_FILE }
-            .flatMap { jsonFile ->
+            .mapNotNull { jsonFile ->
                 if (jsonFile.exists() && jsonFile.length() > 0) {
                     try {
-                        jsonParser.decodeFromString<List<Model>>(jsonFile.readText())
+                        jsonParser.decodeFromString<ModuleMetadata>(jsonFile.readText())
                     } catch (e: Exception) {
                         env.logger.error("--- KREPLICA-KSP: Failed to parse metadata file: ${jsonFile.absolutePath} ---\n${e.stackTraceToString()}")
-                        emptyList()
+                        null
                     }
                 } else {
-                    emptyList()
+                    null
                 }
             }
-        state.upstreamModels.addAll(loadedModels)
+
+        state.upstreamModels.addAll(loadedMetadata.flatMap { it.models })
+        loadedMetadata.forEach { metadata ->
+            state.upstreamSerializers.putAll(metadata.exportedSerializers)
+        }
         state.initialized = true
     }
 
@@ -70,12 +70,16 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
             .filter { it.isNonHiddenModelAnnotation() }
             .toList()
 
+        val configSymbols = resolver
+            .getSymbolsWithAnnotation(REPLICATE_CONFIG_ANNOTATION_NAME)
+            .toList()
+
         if (modelSymbols.isNotEmpty()) {
             generateStubs(modelSymbols, env)
         }
 
         state.round = ProcessingState.ProcessingRound.SECOND
-        return modelSymbols
+        return modelSymbols + configSymbols
     }
 
     private fun processModels(resolver: Resolver): List<KSAnnotated> {
@@ -85,6 +89,8 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
             .filter { it.isNonHiddenModelAnnotation() }
             .toList()
 
+        val globalSerializers = resolver.getGlobalSerializerMappings()
+
         val modelAnnotationDeclaration =
             resolver.getClassDeclarationByName(resolver.getKSNameFromString(MODEL_ANNOTATION_NAME))
                 ?: error("Could not resolve @Replicate.Model annotation declaration.")
@@ -92,10 +98,19 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
 
         val frameworkDecls = getFrameworkDeclarations(resolver)
         val builtModels = modelSymbols.map { decl ->
-            buildModel(decl, resolver, frameworkDecls, annotationContext, env)
+            buildModel(
+                decl,
+                resolver,
+                frameworkDecls,
+                annotationContext,
+                env,
+                state.upstreamSerializers,
+                globalSerializers
+            )
         }
         this.state.builtModels.addAll(builtModels)
         this.state.sourceSymbols.addAll(modelSymbols)
+        this.state.globalSerializers = globalSerializers
         return emptyList()
     }
 
@@ -140,11 +155,23 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
             exitProcess(1)
         }
 
-        writeModelsToFile(this.state.builtModels, this.state.sourceSymbols.toList())
+        writeModelsToFile(
+            this.state.builtModels,
+            this.state.sourceSymbols.toList(),
+            this.state.globalSerializers
+        )
     }
 
-    private fun writeModelsToFile(models: List<Model>, sourceSymbols: List<KSClassDeclaration>) {
-        val jsonText = jsonPrettyPrinter.encodeToString(models)
+    private fun writeModelsToFile(
+        models: List<Model>,
+        sourceSymbols: List<KSClassDeclaration>,
+        exportedSerializers: Map<String, SerializerMapping>
+    ) {
+        val metadata = ModuleMetadata(
+            models = models,
+            exportedSerializers = exportedSerializers
+        )
+        val jsonText = jsonPrettyPrinter.encodeToString(metadata)
         val sourceFiles = sourceSymbols.mapNotNull { it.containingFile }.distinct().toTypedArray()
         val dependencies = Dependencies(true, *sourceFiles)
         val fileName = KReplicaPaths.MODELS_JSON_FILE
@@ -157,6 +184,8 @@ internal class ModelProcessor(private val env: SymbolProcessorEnvironment) : Sym
         val sourceSymbols = mutableSetOf<KSClassDeclaration>()
         var round = ProcessingRound.FIRST
         val upstreamModels = mutableListOf<Model>()
+        val upstreamSerializers = mutableMapOf<String, SerializerMapping>()
+        var globalSerializers = mapOf<String, SerializerMapping>()
         var initialized = false
 
         enum class ProcessingRound {

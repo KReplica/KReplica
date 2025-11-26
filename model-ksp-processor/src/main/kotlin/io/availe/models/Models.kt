@@ -20,7 +20,8 @@ internal data class Model(
     val isVersionOf: String? = null,
     val schemaVersion: Int? = null,
     val visibility: DtoVisibility = DtoVisibility.PUBLIC,
-    val supertypes: List<SupertypeInfo> = emptyList()
+    val supertypes: List<SupertypeInfo> = emptyList(),
+    val typeSerializers: Map<String, SerializerMapping> = emptyMap()
 ) {
     init {
         require(properties.isNotEmpty()) {

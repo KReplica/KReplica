@@ -62,7 +62,9 @@ internal fun buildModel(
     resolver: Resolver,
     frameworkDeclarations: Set<KSClassDeclaration>,
     annotationContext: KReplicaAnnotationContext,
-    environment: SymbolProcessorEnvironment
+    environment: SymbolProcessorEnvironment,
+    upstreamSerializers: Map<String, SerializerMapping>,
+    globalSerializers: Map<String, SerializerMapping>
 ): Model {
     val modelAnnotation = declaration.annotations.first { it.isAnnotation(MODEL_ANNOTATION_NAME) }
 
@@ -103,6 +105,9 @@ internal fun buildModel(
 
     val annotationConfigs = parseApplyAnnotations(declaration, modelDtoVariants, environment)
     val modelAnnotations = declaration.annotations.toAnnotationModels(frameworkDeclarations)
+
+    val localSerializers = extractSerializerMappings(declaration)
+    val finalTypeSerializers = upstreamSerializers + globalSerializers + localSerializers
 
     val versioningInfo = declaration.determineVersioningInfo(environment)
     val properties = declaration.getAllProperties().map { property ->
@@ -149,6 +154,7 @@ internal fun buildModel(
         isVersionOf = versioningInfo?.baseModelName,
         schemaVersion = versioningInfo?.schemaVersion,
         visibility = modelVisibility,
-        supertypes = supertypeInfos
+        supertypes = supertypeInfos,
+        typeSerializers = finalTypeSerializers
     )
 }
