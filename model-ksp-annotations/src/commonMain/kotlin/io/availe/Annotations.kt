@@ -2,7 +2,6 @@ package io.availe
 
 import io.availe.models.DtoVariant
 import io.availe.models.DtoVisibility
-import kotlinx.serialization.KSerializer
 import kotlin.reflect.KClass
 
 object Replicate {
@@ -35,14 +34,4 @@ object Replicate {
 
     @Target(AnnotationTarget.PROPERTY)
     annotation class Flatten
-
-    @Repeatable
-    @Target(AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.CLASS)
-    annotation class TypeSerializer(
-        val type: KClass<*>,
-        val serializer: KClass<out KSerializer<*>>
-    )
-
-    @Target(AnnotationTarget.CLASS)
-    annotation class Config
 }

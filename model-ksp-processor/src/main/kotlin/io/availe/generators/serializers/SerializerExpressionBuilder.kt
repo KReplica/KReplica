@@ -2,7 +2,6 @@ package io.availe.generators.serializers
 
 import com.squareup.kotlinpoet.*
 import io.availe.builders.asClassName
-import io.availe.models.SerializerMapping
 
 internal object SerializerExpressionBuilder {
     private val LIST_SERIALIZER = MemberName("kotlinx.serialization.builtins", "ListSerializer")

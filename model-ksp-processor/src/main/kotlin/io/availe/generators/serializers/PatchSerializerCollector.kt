@@ -5,7 +5,6 @@ import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
-import io.availe.models.SerializerMapping
 
 internal class PatchSerializerCollector(
     private val packageName: String,

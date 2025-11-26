@@ -6,7 +6,6 @@ import io.availe.extensions.KREPLICA_SERIALIZATION_CONFIG_INTERFACE
 import io.availe.extensions.REPLICATE_CONFIG_ANNOTATION_NAME
 import io.availe.extensions.REPLICATE_TYPE_SERIALIZER_ANNOTATION_NAME
 import io.availe.extensions.isAnnotation
-import io.availe.models.SerializerMapping
 
 internal fun Resolver.getGlobalSerializerMappings(): Map<String, SerializerMapping> {
     val configSymbols = this.getSymbolsWithAnnotation(REPLICATE_CONFIG_ANNOTATION_NAME)
