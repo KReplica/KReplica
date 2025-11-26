@@ -11,14 +11,6 @@ internal fun Model.isSerializable(dtoVariant: DtoVariant): Boolean {
     }
 }
 
-private fun getPatchableClassName(model: Model, dtoVariant: DtoVariant): ClassName {
-    return if (model.isSerializable(dtoVariant)) {
-        ClassName(MODELS_PACKAGE_NAME, SERIALIZABLE_PATCHABLE_CLASS_NAME)
-    } else {
-        ClassName(MODELS_PACKAGE_NAME, PATCHABLE_CLASS_NAME)
-    }
-}
-
 internal fun buildDataTransferObjectClass(
     model: Model,
     properties: List<Property>,
@@ -124,7 +116,7 @@ private fun TypeSpec.Builder.addConfiguredProperty(
         }
 
         if (dtoVariant == DtoVariant.PATCH) {
-            val patchableClassName = getPatchableClassName(model, dtoVariant)
+            val patchableClassName = ClassName(MODELS_PACKAGE_NAME, PATCHABLE_CLASS_NAME)
             defaultValue("%T.%L", patchableClassName, UNCHANGED_OBJECT_NAME)
         }
     }

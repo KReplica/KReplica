@@ -4,7 +4,7 @@ import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
-import io.availe.SERIALIZABLE_PATCHABLE_CLASS_NAME
+import io.availe.PATCHABLE_CLASS_NAME
 import io.availe.models.*
 
 internal fun resolveTypeNameForProperty(
@@ -14,11 +14,7 @@ internal fun resolveTypeNameForProperty(
     modelsByBaseName: Map<String, List<Model>>,
     isContainerSerializable: Boolean
 ): TypeName {
-    val patchableClassName = if (model.isSerializable(dtoVariant)) {
-        ClassName("io.availe.models", SERIALIZABLE_PATCHABLE_CLASS_NAME)
-    } else {
-        ClassName("io.availe.models", "Patchable")
-    }
+    val patchableClassName = ClassName("io.availe.models", PATCHABLE_CLASS_NAME)
 
     val finalAutoContextualEnabled = property.autoContextual == AutoContextual.ENABLED
 

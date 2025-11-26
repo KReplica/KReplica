@@ -1,6 +1,9 @@
 package io.availe.models
 
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.descriptors.SerialDescriptor
+import kotlinx.serialization.encoding.Decoder
+import kotlinx.serialization.encoding.Encoder
 
 /**
  * Used by generated PATCH request code to mark fields as updated or unchanged.
@@ -11,15 +14,19 @@ sealed interface Patchable<out T> {
     data object Unchanged : Patchable<Nothing>
 }
 
-/**
- * Used by generated serializable PATCH request code to mark fields as updated or unchanged.
- * Use Set(value) to update a field, or Unchanged to leave it as-is.
- */
-@Serializable
-sealed interface SerializablePatchable<out T> {
-    @Serializable
-    data class Set<out T>(val value: T) : SerializablePatchable<T>
+abstract class BasePatchableSerializer<T>(
+    private val dataSerializer: KSerializer<T>
+) : KSerializer<Patchable<T>> {
 
-    @Serializable
-    data object Unchanged : SerializablePatchable<Nothing>
+    override val descriptor: SerialDescriptor = dataSerializer.descriptor
+
+    override fun serialize(encoder: Encoder, value: Patchable<T>) {
+        if (value is Patchable.Set) {
+            encoder.encodeSerializableValue(dataSerializer, value.value)
+        }
+    }
+
+    override fun deserialize(decoder: Decoder): Patchable<T> {
+        return Patchable.Set(decoder.decodeSerializableValue(dataSerializer))
+    }
 }
