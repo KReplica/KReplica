@@ -16,8 +16,7 @@ internal data class KSTypeInfo(
     val isNullable: Boolean,
     val isEnum: Boolean,
     val isValueClass: Boolean,
-    val isDataClass: Boolean,
-    val requiresContextual: Boolean
+    val isDataClass: Boolean
 ) {
     companion object {
         private const val JVM_INLINE_ANNOTATION_FQN = "kotlin.jvm.JvmInline"
@@ -37,7 +36,6 @@ internal data class KSTypeInfo(
             val nullable = ksType.isMarkedNullable
             val isEnum = decl.classKind == ClassKind.ENUM_CLASS
             val isData = decl.modifiers.contains(Modifier.DATA)
-            val needsContextual = ksType.needsContextualSerializer(resolver)
 
             val isValueByModifier = decl.modifiers.contains(Modifier.VALUE)
             val isValueByAnnotation = decl.annotations.any {
@@ -45,7 +43,7 @@ internal data class KSTypeInfo(
             }
             val isValue = isValueByModifier || isValueByAnnotation
 
-            return KSTypeInfo(qualified, args, nullable, isEnum, isValue, isData, needsContextual)
+            return KSTypeInfo(qualified, args, nullable, isEnum, isValue, isData)
         }
     }
 }
@@ -57,6 +55,5 @@ internal fun KSTypeInfo.toModelTypeInfo(): TypeInfo =
         isNullable = isNullable,
         isEnum = isEnum,
         isValueClass = isValueClass,
-        isDataClass = isDataClass,
-        requiresContextual = requiresContextual
+        isDataClass = isDataClass
     )

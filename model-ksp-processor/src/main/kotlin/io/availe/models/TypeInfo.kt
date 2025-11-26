@@ -9,8 +9,7 @@ internal data class TypeInfo(
     val isNullable: Boolean = false,
     val isEnum: Boolean = false,
     val isValueClass: Boolean = false,
-    val isDataClass: Boolean = false,
-    val requiresContextual: Boolean = false
+    val isDataClass: Boolean = false
 )
 
 @Serializable

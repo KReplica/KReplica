@@ -12,7 +12,6 @@ import io.availe.models.*
 internal fun processProperty(
     propertyDeclaration: KSPropertyDeclaration,
     modelDtoVariants: Set<DtoVariant>,
-    modelAutoContextual: AutoContextual,
     resolver: Resolver,
     frameworkDeclarations: Set<KSClassDeclaration>,
     annotationContext: KReplicaAnnotationContext,
@@ -52,16 +51,6 @@ internal fun processProperty(
             exclude.isNotEmpty() -> modelDtoVariants - exclude
             else -> modelDtoVariants
         }
-    }
-
-    val propertyAutoContextual = fieldAnnotation?.arguments
-        ?.find { it.name?.asString() == "autoContextual" }
-        ?.let { AutoContextual.valueOf((it.value as KSDeclaration).simpleName.asString()) }
-
-    val finalAutoContextual = if (propertyAutoContextual != null && propertyAutoContextual != AutoContextual.INHERIT) {
-        propertyAutoContextual
-    } else {
-        modelAutoContextual
     }
 
     val ksType = propertyDeclaration.type.resolve()
@@ -125,8 +114,7 @@ internal fun processProperty(
                     foreignBaseModelName = baseModelName,
                     foreignVersionName = versionName,
                     dtoVariants = propertyVariants,
-                    annotations = propertyAnnotations,
-                    autoContextual = finalAutoContextual
+                    annotations = propertyAnnotations
                 )
             } else {
                 ForeignProperty(
@@ -135,8 +123,7 @@ internal fun processProperty(
                     baseModelName = baseModelName,
                     versionName = versionName,
                     dtoVariants = propertyVariants,
-                    annotations = propertyAnnotations,
-                    autoContextual = finalAutoContextual
+                    annotations = propertyAnnotations
                 )
             }
         }
@@ -165,7 +152,7 @@ internal fun processProperty(
             }
             RegularProperty(
                 name = propertyName, typeInfo = typeInfo, dtoVariants = propertyVariants,
-                annotations = propertyAnnotations, autoContextual = finalAutoContextual
+                annotations = propertyAnnotations
             )
         }
     }

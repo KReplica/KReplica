@@ -8,7 +8,6 @@ internal sealed class Property {
     abstract val typeInfo: TypeInfo
     abstract val dtoVariants: Set<DtoVariant>
     abstract val annotations: List<AnnotationModel>
-    abstract val autoContextual: AutoContextual
 }
 
 @Serializable
@@ -16,8 +15,7 @@ internal data class RegularProperty(
     override val name: String,
     override val typeInfo: TypeInfo,
     override val dtoVariants: Set<DtoVariant>,
-    override val annotations: List<AnnotationModel> = emptyList(),
-    override val autoContextual: AutoContextual
+    override val annotations: List<AnnotationModel> = emptyList()
 ) : Property()
 
 @Serializable
@@ -27,8 +25,7 @@ internal data class ForeignProperty(
     val baseModelName: String,
     val versionName: String,
     override val dtoVariants: Set<DtoVariant>,
-    override val annotations: List<AnnotationModel> = emptyList(),
-    override val autoContextual: AutoContextual
+    override val annotations: List<AnnotationModel> = emptyList()
 ) : Property()
 
 @Serializable
@@ -38,6 +35,5 @@ internal data class FlattenedProperty(
     val foreignBaseModelName: String,
     val foreignVersionName: String,
     override val dtoVariants: Set<DtoVariant>,
-    override val annotations: List<AnnotationModel> = emptyList(),
-    override val autoContextual: AutoContextual
+    override val annotations: List<AnnotationModel> = emptyList()
 ) : Property()

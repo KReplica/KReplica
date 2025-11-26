@@ -10,6 +10,7 @@ import io.availe.builders.asClassName
 import io.availe.builders.buildAnnotationSpec
 import io.availe.builders.buildDataTransferObjectClass
 import io.availe.builders.overwriteFile
+import io.availe.generators.serializers.PatchSerializerCollector
 import io.availe.models.*
 import io.availe.validation.fieldsFor
 
@@ -56,19 +57,24 @@ internal fun generateInternalSchemasFile(
     val representativeModel = primaryModels.first()
     val packageName = representativeModel.packageName
 
+    val collector = PatchSerializerCollector(packageName, "Internal")
+
     val fileSpec = FileSpec.builder(packageName, INTERNAL_SCHEMAS_FILE_NAME).apply {
         addFileComment(FILE_HEADER_COMMENT)
+        addImport("kotlinx.serialization.builtins", "serializer", "ListSerializer", "SetSerializer", "MapSerializer")
         addOptInMarkersForModels(primaryModels, modelsByBaseName)
 
         primaryModelsByBaseName.forEach { (baseName, versions) ->
             val model = versions.first()
             val schemaTypeSpec = if (model.isVersionOf != null) {
-                buildVersionedSchema(baseName, versions, modelsByBaseName, KModifier.INTERNAL)
+                buildVersionedSchema(baseName, versions, modelsByBaseName, KModifier.INTERNAL, collector)
             } else {
-                buildUnversionedSchema(baseName, model, modelsByBaseName, KModifier.INTERNAL)
+                buildUnversionedSchema(baseName, model, modelsByBaseName, KModifier.INTERNAL, collector)
             }
             addType(schemaTypeSpec)
         }
+
+        collector.generatedSerializers().forEach { addType(it) }
     }.build()
 
     overwriteFile(fileSpec, codeGenerator, dependencies)
@@ -83,17 +89,22 @@ private fun generatePublicSchemaFile(
 ) {
     val representativeModel = versions.first()
     val schemaFileName = (representativeModel.isVersionOf ?: representativeModel.name) + SCHEMA_SUFFIX
+    val collector = PatchSerializerCollector(representativeModel.packageName, baseName)
 
     val fileSpec = FileSpec.builder(representativeModel.packageName, schemaFileName).apply {
         addFileComment(FILE_HEADER_COMMENT)
+        addImport("kotlinx.serialization.builtins", "serializer", "ListSerializer", "SetSerializer", "MapSerializer")
         addOptInMarkersForModels(versions, modelsByBaseName)
         if (representativeModel.isVersionOf != null) {
-            val schemaSpec = buildVersionedSchema(baseName, versions, modelsByBaseName, KModifier.PUBLIC)
+            val schemaSpec = buildVersionedSchema(baseName, versions, modelsByBaseName, KModifier.PUBLIC, collector)
             addType(schemaSpec)
         } else {
-            val schemaSpec = buildUnversionedSchema(baseName, versions.first(), modelsByBaseName, KModifier.PUBLIC)
+            val schemaSpec =
+                buildUnversionedSchema(baseName, versions.first(), modelsByBaseName, KModifier.PUBLIC, collector)
             addType(schemaSpec)
         }
+
+        collector.generatedSerializers().forEach { addType(it) }
     }.build()
 
     overwriteFile(fileSpec, codeGenerator, dependencies)
@@ -103,7 +114,8 @@ private fun buildVersionedSchema(
     baseName: String,
     versions: List<Model>,
     modelsByBaseName: Map<String, List<Model>>,
-    visibility: KModifier
+    visibility: KModifier,
+    collector: PatchSerializerCollector
 ): TypeSpec {
     val representativeModel = versions.first()
     val schemaFileName = (representativeModel.isVersionOf ?: representativeModel.name) + SCHEMA_SUFFIX
@@ -115,12 +127,11 @@ private fun buildVersionedSchema(
     return TypeSpec.interfaceBuilder(schemaFileName).apply {
         addModifiers(KModifier.SEALED, visibility)
         supertypesFqns.forEach {
-            addSuperinterface(it.fqn.asClassName()) // Fixed line
+            addSuperinterface(it.fqn.asClassName())
         }
 
-        if (isGloballySerializable) {
-            addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
-        }
+        addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
+
         addKdoc(TOP_LEVEL_CLASS_KDOC, baseName)
 
         val allVariants = versions.flatMap { it.dtoVariants }.toSet()
@@ -134,7 +145,7 @@ private fun buildVersionedSchema(
         }
 
         versions.forEach { version ->
-            val dtos = generateDataTransferObjects(version, modelsByBaseName)
+            val dtos = generateDataTransferObjects(version, modelsByBaseName, collector)
             val versionClass = TypeSpec.interfaceBuilder(version.name).apply {
                 addModifiers(KModifier.SEALED)
                 addSuperinterface(ClassName(packageName, schemaFileName))
@@ -154,7 +165,8 @@ private fun buildUnversionedSchema(
     baseName: String,
     model: Model,
     modelsByBaseName: Map<String, List<Model>>,
-    visibility: KModifier
+    visibility: KModifier,
+    collector: PatchSerializerCollector
 ): TypeSpec {
     val schemaFileName = model.name + SCHEMA_SUFFIX
     val schemaInterfaceName = ClassName(model.packageName, schemaFileName)
@@ -165,16 +177,15 @@ private fun buildUnversionedSchema(
     return TypeSpec.interfaceBuilder(schemaInterfaceName).apply {
         addModifiers(KModifier.SEALED, visibility)
         supertypesFqns.forEach {
-            addSuperinterface(it.fqn.asClassName()) // Fixed line
+            addSuperinterface(it.fqn.asClassName())
         }
 
         addKdoc("A sealed hierarchy representing all variants of the %L data model.", baseName)
         model.annotations.forEach { addAnnotation(buildAnnotationSpec(it)) }
-        if (isGloballySerializable) {
-            addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
-        }
 
-        val dtos = generateDataTransferObjects(model, modelsByBaseName)
+        addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
+
+        val dtos = generateDataTransferObjects(model, modelsByBaseName, collector)
         dtos.forEach { dtoSpec ->
             val dtoBuilder = dtoSpec.toBuilder().apply {
                 addSuperinterface(schemaInterfaceName)
@@ -193,11 +204,15 @@ private fun buildUnversionedSchema(
     }.build()
 }
 
-private fun generateDataTransferObjects(model: Model, modelsByBaseName: Map<String, List<Model>>): List<TypeSpec> {
+private fun generateDataTransferObjects(
+    model: Model,
+    modelsByBaseName: Map<String, List<Model>>,
+    collector: PatchSerializerCollector
+): List<TypeSpec> {
     return model.dtoVariants.mapNotNull { variant ->
         val fields = model.fieldsFor(variant)
         if (fields.isNotEmpty() || model.properties.any { it is FlattenedProperty && variant in it.dtoVariants }) {
-            buildDataTransferObjectClass(model, model.properties, variant, modelsByBaseName)
+            buildDataTransferObjectClass(model, model.properties, variant, modelsByBaseName, collector)
         } else null
     }
 }

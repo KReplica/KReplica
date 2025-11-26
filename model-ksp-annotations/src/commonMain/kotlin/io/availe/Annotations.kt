@@ -1,6 +1,5 @@
 package io.availe
 
-import io.availe.models.AutoContextual
 import io.availe.models.DtoVariant
 import io.availe.models.DtoVisibility
 import kotlin.reflect.KClass
@@ -9,7 +8,6 @@ object Replicate {
     @Target(AnnotationTarget.CLASS)
     annotation class Model(
         val variants: Array<DtoVariant>,
-        val autoContextual: AutoContextual = AutoContextual.ENABLED,
         val visibility: DtoVisibility = DtoVisibility.PUBLIC,
         val supertypes: Array<KClass<*>> = []
     )
@@ -17,8 +15,7 @@ object Replicate {
     @Target(AnnotationTarget.PROPERTY)
     annotation class Property(
         val exclude: Array<DtoVariant> = [],
-        val include: Array<DtoVariant> = [],
-        val autoContextual: AutoContextual = AutoContextual.INHERIT
+        val include: Array<DtoVariant> = []
     )
 
     @Repeatable

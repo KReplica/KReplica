@@ -79,19 +79,6 @@ internal fun buildModel(
         }.toSet()
     }
 
-    val modelAutoContextual = modelAnnotation.arguments
-        .find { it.name?.asString() == "autoContextual" }
-        ?.let { AutoContextual.valueOf((it.value as KSDeclaration).simpleName.asString()) }
-        ?: AutoContextual.ENABLED
-
-    if (modelAutoContextual == AutoContextual.INHERIT) {
-        fail(
-            environment,
-            "Model '${declaration.simpleName.asString()}' cannot use autoContextual = INHERIT. " +
-                    "Please specify ENABLED or DISABLED."
-        )
-    }
-
     val modelVisibility = modelAnnotation.arguments
         .find { it.name?.asString() == "visibility" }
         ?.let { DtoVisibility.valueOf((it.value as KSDeclaration).simpleName.asString()) }
@@ -122,7 +109,6 @@ internal fun buildModel(
         processProperty(
             property,
             modelDtoVariants,
-            modelAutoContextual,
             resolver,
             frameworkDeclarations,
             annotationContext,
@@ -135,8 +121,7 @@ internal fun buildModel(
             name = SCHEMA_VERSION_FIELD,
             typeInfo = TypeInfo("kotlin.Int", isNullable = false),
             dtoVariants = modelDtoVariants,
-            annotations = emptyList(),
-            autoContextual = modelAutoContextual
+            annotations = emptyList()
         )
         properties.add(schemaVersionProperty)
     }
@@ -163,7 +148,6 @@ internal fun buildModel(
         optInMarkers = allOptInMarkers,
         isVersionOf = versioningInfo?.baseModelName,
         schemaVersion = versioningInfo?.schemaVersion,
-        autoContextual = modelAutoContextual,
         visibility = modelVisibility,
         supertypes = supertypeInfos
     )

@@ -3,6 +3,7 @@ package io.availe.builders
 import com.squareup.kotlinpoet.*
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import io.availe.*
+import io.availe.generators.serializers.PatchSerializerCollector
 import io.availe.models.*
 
 internal fun Model.isSerializable(dtoVariant: DtoVariant): Boolean {
@@ -15,11 +16,13 @@ internal fun buildDataTransferObjectClass(
     model: Model,
     properties: List<Property>,
     dtoVariant: DtoVariant,
-    modelsByBaseName: Map<String, List<Model>>
+    modelsByBaseName: Map<String, List<Model>>,
+    collector: PatchSerializerCollector
 ): TypeSpec {
     val constructorBuilder = FunSpec.constructorBuilder()
     return TypeSpec.classBuilder(dtoVariant.suffix).apply {
         addModifiers(KModifier.DATA)
+        addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
 
         model.supertypes.forEach { supertypeInfo ->
             val baseClassName = supertypeInfo.fqn.asClassName()
@@ -49,13 +52,14 @@ internal fun buildDataTransferObjectClass(
                             targetProp,
                             model,
                             dtoVariant,
-                            modelsByBaseName
+                            modelsByBaseName,
+                            collector
                         )
                     }
                 }
 
                 is ForeignProperty, is RegularProperty -> {
-                    addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByBaseName)
+                    addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByBaseName, collector)
                 }
             }
         }
@@ -96,16 +100,15 @@ private fun TypeSpec.Builder.addConfiguredProperty(
     property: Property,
     model: Model,
     dtoVariant: DtoVariant,
-    modelsByBaseName: Map<String, List<Model>>
+    modelsByBaseName: Map<String, List<Model>>,
+    collector: PatchSerializerCollector
 ) {
     val isContainerSerializable = model.isSerializable(dtoVariant)
     val typeName = resolveTypeNameForProperty(property, dtoVariant, model, modelsByBaseName, isContainerSerializable)
 
     val paramBuilder = ParameterSpec.builder(property.name, typeName).apply {
-        val shouldFilterContextual = (dtoVariant == DtoVariant.PATCH)
         val annotationsToApply = property.annotations
             .filterNot { it.qualifiedName == OPT_IN_QUALIFIED_NAME }
-            .filterNot { shouldFilterContextual && it.qualifiedName == "kotlinx.serialization.Contextual" }
 
         annotationsToApply.forEach { annotationModel ->
             addAnnotation(buildAnnotationSpec(annotationModel))
@@ -116,6 +119,14 @@ private fun TypeSpec.Builder.addConfiguredProperty(
         }
 
         if (dtoVariant == DtoVariant.PATCH) {
+            val baseType = resolvePropertyBaseType(property, dtoVariant, modelsByBaseName)
+            val serializerName = collector.getOrRegister(baseType)
+            addAnnotation(
+                AnnotationSpec.builder(ClassName("kotlinx.serialization", "Serializable"))
+                    .addMember("with = %T::class", serializerName)
+                    .build()
+            )
+
             val patchableClassName = ClassName(MODELS_PACKAGE_NAME, PATCHABLE_CLASS_NAME)
             defaultValue("%T.%L", patchableClassName, UNCHANGED_OBJECT_NAME)
         }

@@ -10,13 +10,6 @@ enum class DtoVariant(val suffix: String) {
 }
 
 @Serializable
-enum class AutoContextual {
-    ENABLED,
-    DISABLED,
-    INHERIT
-}
-
-@Serializable
 enum class DtoVisibility {
     PUBLIC,
     INTERNAL
