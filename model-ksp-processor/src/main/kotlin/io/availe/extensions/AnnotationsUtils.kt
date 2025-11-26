@@ -131,7 +131,7 @@ internal fun getFrameworkDeclarations(resolver: Resolver): Set<KSClassDeclaratio
         REPLICATE_FLATTEN_ANNOTATION_NAME,
         REPLICATE_CONFIG_ANNOTATION_NAME,
         REPLICATE_SERIALIZERS_ANNOTATION_NAME,
-        "io.availe.Replicate.TypeSerializer"
+        REPLICATE_TYPE_SERIALIZER_ANNOTATION_NAME
     )
         .mapNotNull { fullyQualifiedName ->
             resolver.getClassDeclarationByName(resolver.getKSNameFromString(fullyQualifiedName))

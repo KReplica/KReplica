@@ -36,7 +36,8 @@ object Replicate {
     @Target(AnnotationTarget.PROPERTY)
     annotation class Flatten
 
-    @Target(AnnotationTarget.ANNOTATION_CLASS)
+    @Repeatable
+    @Target(AnnotationTarget.ANNOTATION_CLASS, AnnotationTarget.CLASS)
     annotation class TypeSerializer(
         val type: KClass<*>,
         val serializer: KClass<out KSerializer<*>>
@@ -44,7 +45,7 @@ object Replicate {
 
     @Target(AnnotationTarget.CLASS)
     annotation class Serializers(
-        vararg val value: TypeSerializer
+        val value: Array<TypeSerializer>
     )
 
     @Target(AnnotationTarget.CLASS)

@@ -2,10 +2,7 @@ package io.availe.builders
 
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.symbol.*
-import io.availe.extensions.KREPLICA_SERIALIZATION_CONFIG_INTERFACE
-import io.availe.extensions.REPLICATE_CONFIG_ANNOTATION_NAME
-import io.availe.extensions.REPLICATE_SERIALIZERS_ANNOTATION_NAME
-import io.availe.extensions.isAnnotation
+import io.availe.extensions.*
 import io.availe.models.SerializerMapping
 
 internal fun Resolver.getGlobalSerializerMappings(): Map<String, SerializerMapping> {
@@ -22,7 +19,7 @@ internal fun Resolver.getGlobalSerializerMappings(): Map<String, SerializerMappi
     if (configDecl.classKind != ClassKind.OBJECT) {
         error("@Replicate.Config must be applied to an 'object', but '${configDecl.simpleName.asString()}' is a ${configDecl.classKind}.")
     }
-    
+
     val implementsInterface = configDecl.superTypes.any {
         it.resolve().declaration.qualifiedName?.asString() == KREPLICA_SERIALIZATION_CONFIG_INTERFACE
     }
@@ -35,35 +32,42 @@ internal fun Resolver.getGlobalSerializerMappings(): Map<String, SerializerMappi
 }
 
 internal fun extractSerializerMappings(declaration: KSAnnotated): Map<String, SerializerMapping> {
-    val serializersAnnotation = declaration.annotations
-        .find { it.isAnnotation(REPLICATE_SERIALIZERS_ANNOTATION_NAME) }
-        ?: return emptyMap()
-
-    val typeSerializers = serializersAnnotation.arguments
-        .find { it.name?.asString() == "value" }?.value as? List<*>
-        ?: return emptyMap()
-
     val mappings = mutableMapOf<String, SerializerMapping>()
 
-    for (item in typeSerializers) {
-        val annotation = item as? KSAnnotation ?: continue
-
-        val targetType = annotation.arguments.find { it.name?.asString() == "type" }?.value as? KSType ?: continue
-        val targetFqn = targetType.declaration.qualifiedName?.asString() ?: continue
-
-        val serializerType =
-            annotation.arguments.find { it.name?.asString() == "serializer" }?.value as? KSType ?: continue
-        val serializerDecl = serializerType.declaration as? KSClassDeclaration ?: continue
-        val serializerFqn = serializerDecl.qualifiedName?.asString() ?: continue
-
-        val isObject = serializerDecl.classKind == ClassKind.OBJECT
-
-        mappings[targetFqn] = SerializerMapping(
-            typeFqn = targetFqn,
-            serializerFqn = serializerFqn,
-            isSerializerObject = isObject
-        )
+    declaration.annotations.forEach { annotation ->
+        if (annotation.isAnnotation(REPLICATE_TYPE_SERIALIZER_ANNOTATION_NAME)) {
+            parseTypeSerializerAnnotation(annotation)?.let {
+                mappings[it.typeFqn] = it
+            }
+        } else if (annotation.isAnnotation(REPLICATE_SERIALIZERS_ANNOTATION_NAME)) {
+            val values = annotation.arguments.find { it.name?.asString() == "value" }?.value as? List<*>
+            values?.forEach { item ->
+                (item as? KSAnnotation)?.let { nested ->
+                    parseTypeSerializerAnnotation(nested)?.let {
+                        mappings[it.typeFqn] = it
+                    }
+                }
+            }
+        }
     }
 
     return mappings
+}
+
+private fun parseTypeSerializerAnnotation(annotation: KSAnnotation): SerializerMapping? {
+    val targetType = annotation.arguments.find { it.name?.asString() == "type" }?.value as? KSType ?: return null
+    val targetFqn = targetType.declaration.qualifiedName?.asString() ?: return null
+
+    val serializerType =
+        annotation.arguments.find { it.name?.asString() == "serializer" }?.value as? KSType ?: return null
+    val serializerDecl = serializerType.declaration as? KSClassDeclaration ?: return null
+    val serializerFqn = serializerDecl.qualifiedName?.asString() ?: return null
+
+    val isObject = serializerDecl.classKind == ClassKind.OBJECT
+
+    return SerializerMapping(
+        typeFqn = targetFqn,
+        serializerFqn = serializerFqn,
+        isSerializerObject = isObject
+    )
 }
