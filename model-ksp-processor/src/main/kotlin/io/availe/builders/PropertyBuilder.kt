@@ -19,7 +19,8 @@ internal fun processProperty(
     environment: SymbolProcessorEnvironment
 ): Property {
     val propertyName = propertyDeclaration.simpleName.asString()
-    val parentInterfaceName = (propertyDeclaration.parent as? KSClassDeclaration)?.qualifiedName?.asString() ?: "Unknown Interface"
+    val parentInterfaceName =
+        (propertyDeclaration.parent as? KSClassDeclaration)?.qualifiedName?.asString() ?: "Unknown Interface"
 
     if (propertyDeclaration.isMutable) {
         fail(
@@ -81,6 +82,7 @@ internal fun processProperty(
                 """.trimIndent()
             )
         }
+
         is Valid -> {}
     }
 
@@ -104,23 +106,41 @@ internal fun processProperty(
 
     return when {
         isGeneratedForeignModel && foreignDecl != null -> {
-            val versionName = foreignDecl.simpleName.asString()
-            val baseModelDecl = foreignDecl.parentDeclaration as? KSClassDeclaration
-                ?: fail(environment, "Could not determine parent declaration for generated model '${foreignDecl.qualifiedName?.asString()}'")
-            val baseModelName = baseModelDecl.simpleName.asString().removeSuffix(SCHEMA_SUFFIX)
+            val parent = foreignDecl.parentDeclaration as? KSClassDeclaration
+
+            val (baseModelName, versionName) = if (parent == null) {
+                val schemaName = foreignDecl.simpleName.asString()
+                val modelName = schemaName.removeSuffix(SCHEMA_SUFFIX)
+                modelName to modelName
+            } else {
+                val baseSchemaName = parent.simpleName.asString()
+                val baseName = baseSchemaName.removeSuffix(SCHEMA_SUFFIX)
+                baseName to foreignDecl.simpleName.asString()
+            }
 
             if (isFlattened) {
                 FlattenedProperty(
-                    name = propertyName, typeInfo = typeInfo, foreignBaseModelName = baseModelName, foreignVersionName = versionName,
-                    dtoVariants = propertyVariants, annotations = propertyAnnotations, autoContextual = finalAutoContextual
+                    name = propertyName,
+                    typeInfo = typeInfo,
+                    foreignBaseModelName = baseModelName,
+                    foreignVersionName = versionName,
+                    dtoVariants = propertyVariants,
+                    annotations = propertyAnnotations,
+                    autoContextual = finalAutoContextual
                 )
             } else {
                 ForeignProperty(
-                    name = propertyName, typeInfo = typeInfo, baseModelName = baseModelName, versionName = versionName,
-                    dtoVariants = propertyVariants, annotations = propertyAnnotations, autoContextual = finalAutoContextual
+                    name = propertyName,
+                    typeInfo = typeInfo,
+                    baseModelName = baseModelName,
+                    versionName = versionName,
+                    dtoVariants = propertyVariants,
+                    annotations = propertyAnnotations,
+                    autoContextual = finalAutoContextual
                 )
             }
         }
+
         isModelInterfaceType -> {
             if (isFlattened) {
                 fail(
@@ -135,6 +155,7 @@ internal fun processProperty(
                 )
             }
         }
+
         else -> {
             if (isFlattened) {
                 fail(

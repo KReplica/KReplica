@@ -11,7 +11,7 @@ internal fun Model.fieldsFor(dtoVariant: DtoVariant): List<Property> =
 
 private fun Model.getEffectiveFields(
     dtoVariant: DtoVariant,
-    modelsByBaseAndVersion: Map<Pair<String?, String>, Model>
+    modelsByBaseAndVersion: Map<Pair<String, String>, Model>
 ): Set<String> {
     val localFields = this.properties
         .filter { dtoVariant in it.dtoVariants }
@@ -25,7 +25,10 @@ private fun Model.getEffectiveFields(
         .flatMap { flattenedProperty ->
             val targetModelKey = (flattenedProperty.foreignBaseModelName) to (flattenedProperty.foreignVersionName)
             val targetModel = modelsByBaseAndVersion[targetModelKey]
-                ?: error("Validation failed: Could not find flattened model ${flattenedProperty.foreignBaseModelName}.${flattenedProperty.foreignVersionName}")
+                ?: run {
+                    val availableKeys = modelsByBaseAndVersion.keys.joinToString("\n") { " - $it" }
+                    error("Validation failed: Could not find flattened model ${flattenedProperty.foreignBaseModelName}.${flattenedProperty.foreignVersionName}. Available models:\n$availableKeys")
+                }
             targetModel.getEffectiveFields(dtoVariant, modelsByBaseAndVersion)
         }
 
@@ -33,7 +36,7 @@ private fun Model.getEffectiveFields(
 }
 
 internal fun validateModelReplications(allModels: List<Model>) {
-    val modelsByBaseAndVersion = allModels.associateBy { (it.isVersionOf) to it.name }
+    val modelsByBaseAndVersion = allModels.associateBy { (it.isVersionOf ?: it.name) to it.name }
     val validationErrors = mutableListOf<String>()
 
     validateFlatteningCycles(allModels, modelsByBaseAndVersion, validationErrors)
@@ -64,7 +67,11 @@ internal fun validateModelReplications(allModels: List<Model>) {
             .forEach { foreignProperty ->
                 val targetModelKey = (foreignProperty.baseModelName) to (foreignProperty.versionName)
                 val targetModel = modelsByBaseAndVersion[targetModelKey]
-                    ?: error("Unknown referenced model base='${foreignProperty.baseModelName}' version='${foreignProperty.versionName}' in ${model.name}")
+                    ?: run {
+                        val availableKeys =
+                            modelsByBaseAndVersion.keys.sortedBy { it.toString() }.joinToString("\n") { " - $it" }
+                        error("Unknown referenced model base='${foreignProperty.baseModelName}' version='${foreignProperty.versionName}' in ${model.name}.\nAvailable models keys:\n$availableKeys")
+                    }
 
                 if (DtoVariant.CREATE in foreignProperty.dtoVariants && !(DtoVariant.CREATE in targetModel.dtoVariants)) {
                     validationErrors.add(createDependencyError(model, foreignProperty, targetModel, DtoVariant.CREATE))
@@ -83,7 +90,7 @@ internal fun validateModelReplications(allModels: List<Model>) {
 
 private fun validateFlatteningCollisions(
     allModels: List<Model>,
-    modelsByBaseAndVersion: Map<Pair<String?, String>, Model>,
+    modelsByBaseAndVersion: Map<Pair<String, String>, Model>,
     validationErrors: MutableList<String>
 ) {
     allModels.forEach { model ->
@@ -125,7 +132,7 @@ private fun validateFlatteningCollisions(
 
 private fun validateFlatteningCycles(
     allModels: List<Model>,
-    modelsByBaseAndVersion: Map<Pair<String?, String>, Model>,
+    modelsByBaseAndVersion: Map<Pair<String, String>, Model>,
     validationErrors: MutableList<String>
 ) {
     val flattenGraph = allModels.associate { model ->
@@ -134,7 +141,10 @@ private fun validateFlatteningCycles(
             .map {
                 val key = (it.foreignBaseModelName) to (it.foreignVersionName)
                 modelsByBaseAndVersion[key]
-                    ?: error("Failed cycle check: Could not find model ${it.foreignBaseModelName}.${it.foreignVersionName}")
+                    ?: run {
+                        val availableKeys = modelsByBaseAndVersion.keys.joinToString("\n") { " - $it" }
+                        error("Failed cycle check: Could not find model ${it.foreignBaseModelName}.${it.foreignVersionName}. Available:\n$availableKeys")
+                    }
             }
     }
 
