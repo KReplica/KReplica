@@ -7,24 +7,24 @@ import org.jetbrains.kotlin.gradle.dsl.KotlinProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 fun applyJvmConvention(project: Project, projectVersion: String) {
-    val kotlinExtension = project.extensions.getByType(KotlinProjectExtension::class.java)
+    val kotlinProjectExtension = project.extensions.getByType(KotlinProjectExtension::class.java)
 
-    val genJvmKspKotlin = project.layout.buildDirectory.dir("generated/ksp/main/kotlin")
-    val genJvmKspKotlinFiles = project.files(genJvmKspKotlin)
+    val generatedJvmKspKotlin = project.layout.buildDirectory.dir("generated/ksp/main/kotlin")
+    val generatedJvmKspKotlinFiles = project.files(generatedJvmKspKotlin)
 
-    kotlinExtension.sourceSets.named("main").configure {
-        kotlin.srcDir(genJvmKspKotlinFiles)
+    kotlinProjectExtension.sourceSets.named("main").configure {
+        kotlin.srcDir(generatedJvmKspKotlinFiles)
     }
-    genJvmKspKotlinFiles.builtBy("kspKotlin")
+    generatedJvmKspKotlinFiles.builtBy("kspKotlin")
 
     project.dependencies.apply {
         add("implementation", "io.availe:model-ksp-annotations:$projectVersion")
         add("ksp", "io.availe:model-ksp-processor:$projectVersion")
     }
 
-    val metadataConfig = project.configurations.getByName("kreplicaMetadata")
+    val kreplicaMetadataConfiguration = project.configurations.getByName("kreplicaMetadata")
     val metadataFilesProvider = project.provider {
-        metadataConfig.files.joinToString(java.io.File.pathSeparator)
+        kreplicaMetadataConfiguration.files.joinToString(java.io.File.pathSeparator)
     }
     project.extensions.configure(KspExtension::class.java) {
         arg("kreplica.metadataFiles", metadataFilesProvider)
