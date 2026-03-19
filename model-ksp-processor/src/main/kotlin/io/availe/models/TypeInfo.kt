@@ -15,6 +15,6 @@ internal data class TypeInfo(
 
 @Serializable
 internal data class SupertypeInfo(
-    val fqn: String,
+    val fullyQualifiedName: String,
     val isSerializable: Boolean
 )

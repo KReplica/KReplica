@@ -7,7 +7,7 @@ import io.availe.models.AnnotationArgument
 import io.availe.models.AnnotationModel
 import io.availe.models.DtoVariant
 
-private val V_INT_REGEX = Regex("^V(\\d+)$")
+private val VERSION_INTEGER_REGEX = Regex("^V(\\d+)$")
 
 internal fun fail(environment: SymbolProcessorEnvironment, message: String): Nothing {
     error(message)
@@ -15,27 +15,6 @@ internal fun fail(environment: SymbolProcessorEnvironment, message: String): Not
 
 internal fun KSAnnotation.isAnnotation(qualifiedName: String): Boolean {
     return this.annotationType.resolve().declaration.qualifiedName?.asString() == qualifiedName
-}
-
-internal fun KSClassDeclaration.extractAllOptInMarkers(): List<String> {
-    val classMarkers = this.annotations
-        .filter { it.isAnnotation(OPT_IN_ANNOTATION_NAME) }
-        .flatMap { optInAnnotation ->
-            (optInAnnotation.arguments.firstOrNull()?.value as? List<*>)?.mapNotNull {
-                (it as? KSType)?.declaration?.qualifiedName?.asString()
-            } ?: emptyList()
-        }
-
-    val propertyMarkers = this.getAllProperties()
-        .flatMap { property -> property.annotations }
-        .filter { annotation -> annotation.isAnnotation(OPT_IN_ANNOTATION_NAME) }
-        .flatMap { optInAnnotation ->
-            (optInAnnotation.arguments.firstOrNull()?.value as? List<*>)?.mapNotNull {
-                (it as? KSType)?.declaration?.qualifiedName?.asString()
-            } ?: emptyList()
-        }
-
-    return (classMarkers + propertyMarkers).distinct().toList()
 }
 
 internal data class VersioningInfo(val baseModelName: String, val schemaVersion: Int)
@@ -58,7 +37,7 @@ internal fun KSClassDeclaration.determineVersioningInfo(
         ?.arguments
         ?.firstOrNull { it.name?.asString() == SCHEMA_VERSION_ARG }
         ?.value as? Int
-    val inferredVersion = V_INT_REGEX.find(this.simpleName.asString())?.groupValues?.get(1)?.toIntOrNull()
+    val inferredVersion = VERSION_INTEGER_REGEX.find(this.simpleName.asString())?.groupValues?.get(1)?.toIntOrNull()
     val version = explicitVersion ?: inferredVersion ?: fail(
         environment,
         "Versioned model '${this.simpleName.asString()}' must either be named 'V<N>' (e.g., V1) " +
@@ -67,7 +46,7 @@ internal fun KSClassDeclaration.determineVersioningInfo(
     return VersioningInfo(baseInterface.simpleName.asString(), version)
 }
 
-private fun ksAnnotationToModel(
+private fun kotlinSymbolAnnotationToModel(
     annotation: KSAnnotation,
     frameworkDeclarations: Set<KSClassDeclaration>
 ): AnnotationModel? {
@@ -82,7 +61,7 @@ private fun ksAnnotationToModel(
         val modelArgument: AnnotationArgument? = when (rawValue) {
             is String -> AnnotationArgument.StringValue(rawValue)
             is KSType -> AnnotationArgument.LiteralValue("${rawValue.declaration.qualifiedName!!.asString()}::class")
-            is KSAnnotation -> ksAnnotationToModel(
+            is KSAnnotation -> kotlinSymbolAnnotationToModel(
                 rawValue,
                 frameworkDeclarations
             )?.let { AnnotationArgument.AnnotationValue(it) }
@@ -111,7 +90,7 @@ private fun ksAnnotationToModel(
 internal fun Sequence<KSAnnotation>.toAnnotationModels(
     frameworkDeclarations: Set<KSClassDeclaration>
 ): List<AnnotationModel> =
-    mapNotNull { ksAnnotationToModel(it, frameworkDeclarations) }
+    mapNotNull { kotlinSymbolAnnotationToModel(it, frameworkDeclarations) }
         .toList()
 
 internal fun KSClassDeclaration.isNonHiddenModelAnnotation(): Boolean {
@@ -138,9 +117,9 @@ internal fun getFrameworkDeclarations(resolver: Resolver): Set<KSClassDeclaratio
 
 internal fun KSClassDeclaration?.isGeneratedVariantContainer(): Boolean {
     if (this == null || Modifier.SEALED !in this.modifiers) return false
-    val nestedDecls = this.declarations
+    val nestedDeclarations = this.declarations
         .filterIsInstance<KSClassDeclaration>()
         .map { it.simpleName.asString() }
         .toSet()
-    return DtoVariant.entries.all { it.suffix in nestedDecls }
+    return DtoVariant.entries.all { it.suffix in nestedDeclarations }
 }

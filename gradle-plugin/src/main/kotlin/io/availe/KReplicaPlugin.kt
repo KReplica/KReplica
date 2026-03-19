@@ -7,7 +7,7 @@ import org.gradle.api.Project
 
 class KReplicaPlugin : Plugin<Project> {
     override fun apply(target: Project) {
-        val projectVersion = "6.0.0-alpha2"
+        val projectVersion = "6.0.0-alpha3"
         val kreplicaMetadata = target.configurations.create("kreplicaMetadata") {
             isCanBeResolved = true
             isCanBeConsumed = false

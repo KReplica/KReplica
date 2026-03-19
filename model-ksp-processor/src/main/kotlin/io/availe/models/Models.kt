@@ -16,7 +16,6 @@ internal data class Model(
     val dtoVariants: Set<DtoVariant>,
     val annotationConfigs: List<AnnotationConfigModel> = emptyList(),
     val annotations: List<AnnotationModel> = emptyList(),
-    val optInMarkers: List<String> = emptyList(),
     val isVersionOf: String? = null,
     val schemaVersion: Int? = null,
     val visibility: DtoVisibility = DtoVisibility.PUBLIC,
@@ -31,14 +30,14 @@ internal data class Model(
         }
         require(invalidProperties.isEmpty()) {
             val count = invalidProperties.size
-            val pluralS = if (count == 1) "" else "s"
+            val pluralSuffix = if (count == 1) "" else "s"
             val noun = if (count == 1) "property" else "properties"
             val verb = if (count == 1) "is" else "are"
             val propertiesReport = invalidProperties.joinToString("\n") {
                 " - Property: '${it.name}' (has variants '${it.dtoVariants}')"
             }
             """
-            Invalid property variant$pluralS found in model '$name':
+            Invalid property variant$pluralSuffix found in model '$name':
             The model's variants are '${this.dtoVariants}', which does not fully contain the property's variants.
             The following $noun $verb invalid:
             $propertiesReport

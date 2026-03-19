@@ -15,7 +15,7 @@ plugins {
 
 allprojects {
     group = "io.availe"
-    version = "6.0.0-alpha2"
+    version = "6.0.0-alpha3"
 }
 
 subprojects {

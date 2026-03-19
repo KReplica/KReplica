@@ -18,14 +18,14 @@ private fun parseApplyAnnotations(
     }
 
     return applyAnnotations.flatMap { annotation ->
-        val includeArgValue = annotation.arguments.find { it.name?.asString() == "include" }?.value
-        val includeArg = (includeArgValue as? List<*>)
+        val includeArgumentValue = annotation.arguments.find { it.name?.asString() == "include" }?.value
+        val includeArgument = (includeArgumentValue as? List<*>)
             ?.map { DtoVariant.valueOf((it as KSDeclaration).simpleName.asString()) }
             ?.toSet()
             ?: emptySet()
 
-        val excludeArgValue = annotation.arguments.find { it.name?.asString() == "exclude" }?.value
-        val excludeArg = (excludeArgValue as? List<*>)
+        val excludeArgumentValue = annotation.arguments.find { it.name?.asString() == "exclude" }?.value
+        val excludeArgument = (excludeArgumentValue as? List<*>)
             ?.map { DtoVariant.valueOf((it as KSDeclaration).simpleName.asString()) }
             ?.toSet()
             ?: emptySet()
@@ -33,7 +33,7 @@ private fun parseApplyAnnotations(
         val annotationsToApplyValue = annotation.arguments.find { it.name?.asString() == "annotations" }?.value
         val annotationsToApply = (annotationsToApplyValue as? List<*>) ?: emptyList<Any?>()
 
-        val allTargetedVariants = includeArg + excludeArg
+        val allTargetedVariants = includeArgument + excludeArgument
         val unknownVariants = allTargetedVariants - masterDtoVariants
         if (unknownVariants.isNotEmpty()) {
             fail(
@@ -44,13 +44,13 @@ private fun parseApplyAnnotations(
             )
         }
 
-        val initialSet = includeArg.ifEmpty { masterDtoVariants }
-        val finalVariants = initialSet - excludeArg
+        val initialSet = includeArgument.ifEmpty { masterDtoVariants }
+        val finalVariants = initialSet - excludeArgument
 
         annotationsToApply.map { annotationToApplyType ->
-            val annotationFqName = (annotationToApplyType as KSType).declaration.qualifiedName!!.asString()
+            val annotationFullyQualifiedName = (annotationToApplyType as KSType).declaration.qualifiedName!!.asString()
             AnnotationConfigModel(
-                annotation = AnnotationModel(qualifiedName = annotationFqName),
+                annotation = AnnotationModel(qualifiedName = annotationFullyQualifiedName),
                 variants = finalVariants
             )
         }
@@ -91,13 +91,13 @@ internal fun buildModel(
     val supertypeInfos = supertypesArgument
         ?.mapNotNull { it as? KSType }
         ?.filter { it.declaration.qualifiedName?.asString() != "kotlin.Nothing" }
-        ?.map { ksType ->
-            val decl = ksType.declaration as KSClassDeclaration
-            val fqn = decl.qualifiedName!!.asString()
-            val isSerializable = decl.annotations.any {
+        ?.map { kotlinSymbolType ->
+            val nestedDeclaration = kotlinSymbolType.declaration as KSClassDeclaration
+            val fullyQualifiedName = nestedDeclaration.qualifiedName!!.asString()
+            val isSerializable = nestedDeclaration.annotations.any {
                 it.annotationType.resolve().declaration.qualifiedName?.asString() == SERIALIZABLE_ANNOTATION_FQN
             }
-            SupertypeInfo(fqn = fqn, isSerializable = isSerializable)
+            SupertypeInfo(fullyQualifiedName = fullyQualifiedName, isSerializable = isSerializable)
         }
         ?: emptyList()
 
@@ -126,18 +126,6 @@ internal fun buildModel(
         properties.add(schemaVersionProperty)
     }
 
-    val modelOptInMarkers = declaration.extractAllOptInMarkers()
-
-    val flattenedMarkers = properties.filterIsInstance<FlattenedProperty>()
-        .mapNotNull {
-            resolver.getClassDeclarationByName(
-                resolver.getKSNameFromString(it.typeInfo.qualifiedName)
-            )
-        }
-        .flatMap { it.extractAllOptInMarkers() }
-
-    val allOptInMarkers = (modelOptInMarkers + flattenedMarkers).distinct()
-
     return Model(
         name = declaration.simpleName.asString(),
         packageName = declaration.packageName.asString(),
@@ -145,7 +133,6 @@ internal fun buildModel(
         dtoVariants = modelDtoVariants,
         annotationConfigs = annotationConfigs,
         annotations = modelAnnotations,
-        optInMarkers = allOptInMarkers,
         isVersionOf = versioningInfo?.baseModelName,
         schemaVersion = versioningInfo?.schemaVersion,
         visibility = modelVisibility,

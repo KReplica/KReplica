@@ -15,28 +15,28 @@ internal fun Model.isSerializable(dtoVariant: DtoVariant): Boolean {
 internal fun buildDataTransferObjectClass(
     model: Model,
     properties: List<Property>,
-    dtoVariant: DtoVariant,
+    dataTransferObjectVariant: DtoVariant,
     modelsByBaseName: Map<String, List<Model>>,
     collector: PatchSerializerCollector
 ): TypeSpec {
     val constructorBuilder = FunSpec.constructorBuilder()
-    return TypeSpec.classBuilder(dtoVariant.suffix).apply {
+    return TypeSpec.classBuilder(dataTransferObjectVariant.suffix).apply {
         addModifiers(KModifier.DATA)
         addAnnotation(ClassName("kotlinx.serialization", "Serializable"))
 
         model.supertypes.forEach { supertypeInfo ->
-            val baseClassName = supertypeInfo.fqn.asClassName()
+            val baseClassName = supertypeInfo.fullyQualifiedName.asClassName()
             addSuperinterface(baseClassName)
 
-            val variantSupertypeFqn = supertypeInfo.fqn + dtoVariant.suffix
-            val variantClassName = variantSupertypeFqn.asClassName()
+            val variantSupertypeFullyQualifiedName = supertypeInfo.fullyQualifiedName + dataTransferObjectVariant.suffix
+            val variantClassName = variantSupertypeFullyQualifiedName.asClassName()
             addSuperinterface(variantClassName)
         }
 
-        addSuperinterfacesFor(model, dtoVariant)
-        addAnnotationsFor(model, dtoVariant)
+        addSuperinterfacesFor(model, dataTransferObjectVariant)
+        addAnnotationsFor(model, dataTransferObjectVariant)
 
-        val activeProperties = properties.filter { dtoVariant in it.dtoVariants }
+        val activeProperties = properties.filter { dataTransferObjectVariant in it.dtoVariants }
         activeProperties.forEach { property ->
             when (property) {
                 is FlattenedProperty -> {
@@ -44,14 +44,14 @@ internal fun buildDataTransferObjectClass(
                         ?.find { it.name == property.foreignVersionName }
                         ?: error("Could not find model for flattened property: ${property.foreignBaseModelName}.${property.foreignVersionName}")
 
-                    val targetProperties = targetModel.properties.filter { dtoVariant in it.dtoVariants }
-                    targetProperties.forEach { targetProp ->
-                        if (targetProp.name == SCHEMA_VERSION_PROPERTY_NAME) return@forEach
+                    val targetProperties = targetModel.properties.filter { dataTransferObjectVariant in it.dtoVariants }
+                    targetProperties.forEach { targetProperty ->
+                        if (targetProperty.name == SCHEMA_VERSION_PROPERTY_NAME) return@forEach
                         addConfiguredProperty(
                             constructorBuilder,
-                            targetProp,
+                            targetProperty,
                             model,
-                            dtoVariant,
+                            dataTransferObjectVariant,
                             modelsByBaseName,
                             collector
                         )
@@ -59,7 +59,14 @@ internal fun buildDataTransferObjectClass(
                 }
 
                 is ForeignProperty, is RegularProperty -> {
-                    addConfiguredProperty(constructorBuilder, property, model, dtoVariant, modelsByBaseName, collector)
+                    addConfiguredProperty(
+                        constructorBuilder,
+                        property,
+                        model,
+                        dataTransferObjectVariant,
+                        modelsByBaseName,
+                        collector
+                    )
                 }
             }
         }
@@ -67,16 +74,16 @@ internal fun buildDataTransferObjectClass(
     }.build()
 }
 
-private fun TypeSpec.Builder.addSuperinterfacesFor(model: Model, dtoVariant: DtoVariant) {
+private fun TypeSpec.Builder.addSuperinterfacesFor(model: Model, dataTransferObjectVariant: DtoVariant) {
     if (model.isVersionOf != null) {
         val packageName = model.packageName
         val schemaName = model.isVersionOf + "Schema"
         val versionInterface = ClassName(packageName, schemaName, model.name)
-        val variantKindInterface = ClassName(packageName, schemaName, "${dtoVariant.suffix}Variant")
+        val variantKindInterface = ClassName(packageName, schemaName, "${dataTransferObjectVariant.suffix}Variant")
         addSuperinterface(versionInterface)
         addSuperinterface(variantKindInterface)
 
-        val globalVariantInterfaceBase = when (dtoVariant) {
+        val globalVariantInterfaceBase = when (dataTransferObjectVariant) {
             DtoVariant.DATA -> KReplicaDataVariant::class.asClassName()
             DtoVariant.CREATE -> KReplicaCreateVariant::class.asClassName()
             DtoVariant.PATCH -> KReplicaPatchVariant::class.asClassName()
@@ -86,11 +93,11 @@ private fun TypeSpec.Builder.addSuperinterfacesFor(model: Model, dtoVariant: Dto
     }
 }
 
-private fun TypeSpec.Builder.addAnnotationsFor(model: Model, dtoVariant: DtoVariant) {
+private fun TypeSpec.Builder.addAnnotationsFor(model: Model, dataTransferObjectVariant: DtoVariant) {
     model.annotations.forEach { annotationModel ->
         addAnnotation(buildAnnotationSpec(annotationModel))
     }
-    model.annotationConfigs.filter { dtoVariant in it.variants }.forEach { config ->
+    model.annotationConfigs.filter { dataTransferObjectVariant in it.variants }.forEach { config ->
         addAnnotation(buildAnnotationSpec(config.annotation))
     }
 }
@@ -104,13 +111,16 @@ private fun TypeSpec.Builder.addConfiguredProperty(
     collector: PatchSerializerCollector
 ) {
     val isContainerSerializable = model.isSerializable(dtoVariant)
-    val typeName = resolveTypeNameForProperty(property, dtoVariant, model, modelsByBaseName, isContainerSerializable)
+    val typeName = resolveTypeNameForProperty(
+        property,
+        dtoVariant,
+        model,
+        modelsByBaseName,
+        isContainerSerializable
+    )
 
-    val paramBuilder = ParameterSpec.builder(property.name, typeName).apply {
-        val annotationsToApply = property.annotations
-            .filterNot { it.qualifiedName == OPT_IN_QUALIFIED_NAME }
-
-        annotationsToApply.forEach { annotationModel ->
+    val parameterBuilder = ParameterSpec.builder(property.name, typeName).apply {
+        property.annotations.forEach { annotationModel ->
             addAnnotation(buildAnnotationSpec(annotationModel))
         }
 
@@ -132,6 +142,6 @@ private fun TypeSpec.Builder.addConfiguredProperty(
         }
     }
 
-    constructorBuilder.addParameter(paramBuilder.build())
+    constructorBuilder.addParameter(parameterBuilder.build())
     addProperty(PropertySpec.builder(property.name, typeName).initializer(property.name).build())
 }
